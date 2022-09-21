@@ -9,11 +9,16 @@ import com.google.common.base.Strings;
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -21,6 +26,8 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
@@ -71,6 +78,13 @@ public class LiteFullNodeTool {
       TRANS_DB_NAME,
       TRANSACTION_RET_DB_NAME,
       TRANSACTION_HISTORY_DB_NAME);
+
+  private Map<String, ListeningExecutorService> dbServices = new HashMap<>();
+
+  public LiteFullNodeTool() {
+    initArchiveDbServices();
+  }
+
 
   /**
    * Create the snapshot dataset.
@@ -316,17 +330,28 @@ public class LiteFullNodeTool {
             byte[] blockId = getDataFromSourceDB(sourceDir, BLOCK_INDEX_DB_NAME,
                 blockNum);
             byte[] block = getDataFromSourceDB(sourceDir, BLOCK_DB_NAME, blockId);
+            List<ListenableFuture<?>> futures = new ArrayList<>(2);
             // put block
-            destBlockDb.put(blockId, block);
+            futures.add(dbServices.get(BLOCK_DB_NAME).submit(() ->
+                    destBlockDb.put(blockId, block)));
             // put block index
             destBlockIndexDb.put(blockNum, blockId);
             // put trans
-            Map<byte[], byte[]> trans = new HashMap<>();
-            new BlockCapsule(block).getTransactions().stream().map(
-                tc -> tc.getTransactionId().getBytes()).forEach(tid ->
-                trans.put(tid, blockNum));
-            destTransDb.batch(trans);
+            List<TransactionCapsule> transactionCapsules =
+                    new BlockCapsule(block).getTransactions();
+            Map<byte[], byte[]> trans = new ConcurrentHashMap<>(transactionCapsules.size() * 2);
+            transactionCapsules.stream().parallel().map(
+                tc -> tc.getTransactionId().getBytes()).forEach(
+                    tid -> trans.put(tid, blockNum));
+            futures.add(dbServices.get(TRANS_DB_NAME).submit(() -> {
+              try {
+                destTransDb.batch(trans);
+              } catch (Exception e) {
+                throw new RuntimeException(e.getMessage());
+              }
+            }));
             trxCount.addAndGet(trans.size());
+            Futures.allAsList(futures).get();
           } catch (Exception e) {
             throw new RuntimeException(e.getMessage());
           }
@@ -560,6 +585,11 @@ public class LiteFullNodeTool {
         throw new ParameterException("not supportted operate:" + argv.operate);
     }
     DbTool.close();
+  }
+
+  private void initArchiveDbServices() {
+    archiveDbs.stream().forEach(dbName -> dbServices.put(dbName,
+            MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor())));
   }
 
   /**
