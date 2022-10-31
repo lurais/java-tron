@@ -17,7 +17,12 @@ public final class StoreIterator implements org.tron.core.db.common.iterator.DBI
 
   @Override
   public void close() throws IOException {
-    dbIterator.close();
+    //dbIterator.close();
+    logger.info("store iterator close invoked......");
+  }
+
+  public void setFirst(){
+    first=true;
   }
 
   @Override
@@ -31,10 +36,10 @@ public final class StoreIterator implements org.tron.core.db.common.iterator.DBI
       }
 
       if (!(hasNext = dbIterator.hasNext())) { // false is last item
-        dbIterator.close();
+        //dbIterator.close();
       }
     } catch (Exception e) {
-      logger.debug(e.getMessage(), e);
+      logger.info(e.getMessage(), e);
     }
 
     return hasNext;
