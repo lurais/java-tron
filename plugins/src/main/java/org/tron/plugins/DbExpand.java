@@ -5,8 +5,9 @@ import com.typesafe.config.ConfigFactory;
 import me.tongfei.progressbar.ProgressBar;
 import org.apache.commons.lang3.StringUtils;
 
-import static org.iq80.leveldb.impl.Iq80DBFactory.factory;
+import static org.fusesource.leveldbjni.JniDBFactory.factory;
 
+import org.fusesource.leveldbjni.JniDBFactory;
 import org.iq80.leveldb.CompressionType;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBIterator;
@@ -101,6 +102,7 @@ public class DbExpand implements Callable<Integer> {
         List<byte[]> values = new ArrayList<>(BATCH);
         try (DBIterator levelIterator = levelDb.iterator(
                 new org.iq80.leveldb.ReadOptions().fillCache(false))) {
+            JniDBFactory.pushMemoryPool(1024 * 1024);
             levelIterator.seekToFirst();
 
             while (levelIterator.hasNext()) {
@@ -131,6 +133,7 @@ public class DbExpand implements Callable<Integer> {
         } finally {
             try {
                 levelDb.close();
+                JniDBFactory.popMemoryPool();
             } catch (Exception e1) {
                 spec.commandLine().getErr().println(String.format("Close %s error %s."
                         , name, e1.getStackTrace()));
@@ -177,9 +180,8 @@ public class DbExpand implements Callable<Integer> {
     }
 
     public DB openLevelDb(Path p) throws Exception {
-        // 暂不考虑特殊库
-        DB database = factory.open(p.toFile(), getDefaultLevelDbOptions());
-        return database;
+        //特殊库处理
+        return factory.open(p.toFile(), getDefaultLevelDbOptions());
     }
 
     public static org.iq80.leveldb.Options getDefaultLevelDbOptions() {
@@ -194,7 +196,6 @@ public class DbExpand implements Callable<Integer> {
         dbOptions.maxOpenFiles(1000);
         dbOptions.maxBatchSize(64_000);
         dbOptions.maxManifestSize(128);
-        dbOptions.fast(false);
         return dbOptions;
     }
 
