@@ -18,12 +18,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
@@ -32,7 +27,7 @@ import java.util.stream.Collectors;
         description = "expand db size .")
 public class DbExpand implements Callable<Integer> {
 
-    private static final String PROPERTIES_CONFIG_KEY = "storage.properties";
+    private static final String PROPERTIES_CONFIG_KEY = "storage.expandproperties";
     private static final String DB_DIRECTORY_CONFIG_KEY = "storage.db.directory";
     private static final String DEFAULT_DB_DIRECTORY = "database";
     private static final String NAME_CONFIG_KEY = "name";
@@ -40,6 +35,9 @@ public class DbExpand implements Callable<Integer> {
     private static final String RATE_CONFIG_KEY = "rate";
     private static final int BATCH = 256;
     private Random random = new Random(System.currentTimeMillis());
+    public static final byte ADD_PRE_FIX_BYTE_MAINNET = (byte) 0x41;
+    private static Set<String> structureNames = new HashSet<>();
+
 
 
     @CommandLine.Spec
@@ -60,6 +58,11 @@ public class DbExpand implements Callable<Integer> {
 
     @CommandLine.Option(names = {"-h", "--help"}, help = true, description = "display a help message")
     boolean help;
+
+
+    static {
+        structureNames.addAll(Arrays.asList("account"));
+    }
 
     @Override
     public Integer call() {
@@ -107,7 +110,7 @@ public class DbExpand implements Callable<Integer> {
 
             while (levelIterator.hasNext()) {
                 Map.Entry<byte[], byte[]> entry = levelIterator.next();
-                addShuffleKv(entry, rate, keys, values);
+                addShuffleKv(name,entry, rate, keys, values);
                 expandKeyCount += rate;
                 if (keys.size() >= BATCH) {
                     try {
@@ -142,13 +145,34 @@ public class DbExpand implements Callable<Integer> {
         }
     }
 
-    private void addShuffleKv(Map.Entry<byte[], byte[]> entry, int rate, List<byte[]> keys, List<byte[]> values) {
+    private void addShuffleKv(String name ,Map.Entry<byte[], byte[]> entry, int rate, List<byte[]> keys, List<byte[]> values) {
         for (int i = rate; i > 0; i--) {
-            byte[] key = shuffleBytes(entry.getKey());
+            byte[] key = structureKey(name) ? generateStructure(name): shuffleBytes(entry.getKey());
             byte[] value = entry.getValue();
             keys.add(key);
             values.add(value);
         }
+    }
+
+    private byte[] generateStructure(String name) {
+        switch (name){
+            case "account":
+                return generateAddress(32);
+            default:
+                throw new RuntimeException("Db not supported!");
+        }
+    }
+
+    private boolean structureKey(String name) {
+       return structureNames.contains(name);
+    }
+
+    public static byte[] generateAddress(int length) {
+        // generate the random number
+        byte[] result = new byte[length];
+        new Random().nextBytes(result);
+        result[0] = ADD_PRE_FIX_BYTE_MAINNET;
+        return result;
     }
 
     private byte[] shuffleBytes(byte[] item) {
