@@ -1183,7 +1183,7 @@ public class Manager {
             }
             logger.info("Generate block switchFork check  succeed! ");
             try (ISession tmpSession = revokingStore.buildSession()) {
-
+              logger.info("Generate block buildSession succeed!");
               long oldSolidNum =
                       chainBaseManager.getDynamicPropertiesStore().getLatestSolidifiedBlockNum();
 
@@ -1413,6 +1413,8 @@ public class Manager {
       logger.info("Process transaction {} cost {} ms during {}, {}",
               Hex.toHexString(transactionInfo.getId()), cost, type, contract.getType().name());
     }
+    logger.info("Generate block processTransaction:t1="+t1+",t2="+t2+",t3="+t3+",t4="+t4+",t5="+t5+",t6="+t6+",t7="+t7+",t8="+t8+",t9="+t9);
+    logger.info("Generate block processTransaction  trans end!");
     Metrics.histogramObserve(requestTimer);
     return transactionInfo.getInstance();
   }
@@ -1626,16 +1628,21 @@ public class Manager {
           ReceiptCheckErrException, VMIllegalException, TooBigTransactionResultException,
           ZksnarkException, BadBlockException, EventBloomException {
     // todo set revoking db max size.
-
+    logger.info("Generate block processBlock begin");
     // checkWitness
     if (!consensus.validBlock(block)) {
       throw new ValidateScheduleException("validateWitnessSchedule error");
     }
+    logger.info("Generate block processBlock validBlock end!");
 
     chainBaseManager.getBalanceTraceStore().initCurrentBlockBalanceTrace(block);
+    logger.info("Generate block processBlock init currentTrace end!");
+
 
     //reset BlockEnergyUsage
     chainBaseManager.getDynamicPropertiesStore().saveBlockEnergyUsage(0);
+    logger.info("Generate block processBlock save energy end!");
+
     //parallel check sign
     if (!block.generatedByMyself) {
       try {
@@ -1645,19 +1652,28 @@ public class Manager {
         Thread.currentThread().interrupt();
       }
     }
+    logger.info("Generate block processBlock check sign end!");
 
     TransactionRetCapsule transactionRetCapsule =
             new TransactionRetCapsule(block);
     try {
       merkleContainer.resetCurrentMerkleTree();
+      logger.info("Generate block processBlock reset mekele end!");
+
       accountStateCallBack.preExecute(block);
+      logger.info("Generate block processBlock preExecute  end!");
+
       List<TransactionInfo> results = new ArrayList<>();
       for (TransactionCapsule transactionCapsule : block.getTransactions()) {
         transactionCapsule.setBlockNum(block.getNum());
         if (block.generatedByMyself) {
           transactionCapsule.setVerified(true);
         }
+        logger.info("Generate block processBlock preExecute trans begin!");
+
         accountStateCallBack.preExeTrans();
+        logger.info("Generate block processBlock preExecute trans end!");
+
         TransactionInfo result = null;
         try {
           result = processTransaction(transactionCapsule, block);
@@ -1665,50 +1681,69 @@ public class Manager {
           logger.error("process tx failed, id: {}", transactionCapsule.getTransactionId().toString(), e);
           throw new ContractValidateException(transactionCapsule.getTransactionId().toString(), e);
         }
+        logger.info("Generate block process transaction end!");
         accountStateCallBack.exeTransFinish();
+        logger.info("Generate block process transaction finish end!");
+
         if (Objects.nonNull(result)) {
           results.add(result);
         }
       }
       transactionRetCapsule.addAllTransactionInfos(results);
       accountStateCallBack.executePushFinish();
+      logger.info("Generate block execute push finish end!");
     } finally {
       accountStateCallBack.exceptionFinish();
     }
     merkleContainer.saveCurrentMerkleTreeAsBestMerkleTree(block.getNum());
     block.setResult(transactionRetCapsule);
+    logger.info("Generate block setResult end!");
     if (getDynamicPropertiesStore().getAllowAdaptiveEnergy() == 1) {
       EnergyProcessor energyProcessor = new EnergyProcessor(
               chainBaseManager.getDynamicPropertiesStore(), chainBaseManager.getAccountStore());
       energyProcessor.updateTotalEnergyAverageUsage();
       energyProcessor.updateAdaptiveTotalEnergyLimit();
     }
-
+    logger.info("Generate block payReward begin!");
     payReward(block);
+    logger.info("Generate block payReward end!");
 
     if (chainBaseManager.getDynamicPropertiesStore().getNextMaintenanceTime()
             <= block.getTimeStamp()) {
       proposalController.processProposals();
       chainBaseManager.getForkController().reset();
     }
+    logger.info("Generate block payReward begin!");
+
 
     if (!consensus.applyBlock(block)) {
       throw new BadBlockException("consensus apply block failed");
     }
+    logger.info("Generate block consensus.applyBlock end!");
 
     updateTransHashCache(block);
+    logger.info("Generate block updateTransHashCache end!");
+
     updateRecentBlock(block);
+    logger.info("Generate block updateRecentBlock end!");
+
     updateRecentTransaction(block);
+    logger.info("Generate block updateRecentTransaction end!");
+
     updateDynamicProperties(block);
+    logger.info("Generate block updateDynamicProperties end!");
+
 
     chainBaseManager.getBalanceTraceStore().resetCurrentBlockTrace();
-
+    logger.info("Generate block resetCurrentBlockTrace end!");
     if (CommonParameter.getInstance().isJsonRpcFilterEnabled()) {
       Bloom blockBloom = chainBaseManager.getSectionBloomStore()
               .initBlockSection(transactionRetCapsule);
       chainBaseManager.getSectionBloomStore().write(block.getNum());
       block.setBloom(blockBloom);
     }
+    logger.info("Generate block setBloom end!");
+
   }
 
   private void payReward(BlockCapsule block) {
