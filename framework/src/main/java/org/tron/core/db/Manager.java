@@ -1074,6 +1074,8 @@ public class Manager {
     setBlockWaitLock(true);
     try {
       synchronized (this) {
+        logger.info("Genearate block ,pushBlock get manager lock succeed! ");
+
         Metrics.histogramObserve(blockedTimer.get());
         blockedTimer.remove();
         long headerNumber = getDynamicPropertiesStore().getLatestBlockHeaderNumber();
@@ -1097,6 +1099,7 @@ public class Manager {
         }
 
         try (PendingManager pm = new PendingManager(this)) {
+          logger.info("Generate block  pendingmanager build succeed! ");
 
           if (!block.generatedByMyself) {
             if (!block.calcMerkleRoot().equals(block.getMerkleRoot())) {
@@ -1107,6 +1110,7 @@ public class Manager {
             }
             consensus.receiveBlock(block);
           }
+          logger.info("Generate block  consensus.receiveBlock  succeed! ");
 
           if (block.getTransactions().stream()
                   .filter(tran -> isShieldedTransaction(tran.getInstance()))
@@ -1128,6 +1132,8 @@ public class Manager {
                     getDynamicPropertiesStore().getLatestSolidifiedBlockNum());
             throw e;
           }
+          logger.info("Generate block  khaosDb.push  succeed! ");
+
 
           // DB don't need lower block
           if (getDynamicPropertiesStore().getLatestBlockHeaderHash() == null) {
@@ -1175,6 +1181,7 @@ public class Manager {
 
               return;
             }
+            logger.info("Generate block switchFork check  succeed! ");
             try (ISession tmpSession = revokingStore.buildSession()) {
 
               long oldSolidNum =
@@ -1182,6 +1189,7 @@ public class Manager {
 
               applyBlock(newBlock, txs);
               tmpSession.commit();
+              logger.info("Generate block applyBlock succeed! ");
 
               MarketAccountStore marketAccountStore = chainBaseManager.getMarketAccountStore();
               for (Map.Entry<byte[], MarketAccountOrderCapsule> entry: marketAccountStore) {
@@ -1205,6 +1213,7 @@ public class Manager {
           }
           logger.info(SAVE_BLOCK, newBlock);
         }
+        logger.info("Generate block pendingmanager deal succeed! ");
         //clear ownerAddressSet
         if (CollectionUtils.isNotEmpty(ownerAddressSet)) {
           Set<String> result = new HashSet<>();
@@ -1221,10 +1230,11 @@ public class Manager {
         long cost = System.currentTimeMillis() - start;
         MetricsUtil.meterMark(MetricsKey.BLOCKCHAIN_BLOCK_PROCESS_TIME, cost);
 
-        logger.info("pushBlock block number:{}, cost/txs:{}/{} {}",
+        logger.info("PushBlock block number: {}, cost/txs: {}/{} {}.",
                 block.getNum(), cost, block.getTransactions().size(), cost > 1000);
 
         Metrics.histogramObserve(timer);
+        logger.info("Generate block pushBlock release manager lock succeed! cost= "+cost);
       }
     } finally {
       setBlockWaitLock(false);
@@ -1422,11 +1432,16 @@ public class Manager {
     BlockCapsule blockCapsule = new BlockCapsule(chainBaseManager.getHeadBlockNum() + 1,
             chainBaseManager.getHeadBlockId(),
             blockTime, miner.getWitnessAddress());
+    logger.info("Generate block block constructed.");
     blockCapsule.generatedByMyself = true;
     session.reset();
+    logger.info("Generate block reset done .");
     session.setValue(revokingStore.buildSession());
+    logger.info("Generate block buildSession done .");
 
     accountStateCallBack.preExecute(blockCapsule);
+    logger.info("Generate block preExecute done .");
+
 
     if (getDynamicPropertiesStore().getAllowMultiSign() == 1) {
       byte[] privateKeyAddress = miner.getPrivateKeyAddress().toByteArray();
@@ -1437,13 +1452,17 @@ public class Manager {
         return null;
       }
     }
+    logger.info("Generate block Witness permission check done .");
 
     Set<String> accountSet = new HashSet<>();
     AtomicInteger shieldedTransCounts = new AtomicInteger(0);
     List<TransactionCapsule> toBePacked = new ArrayList<>();
     long currentSize = blockCapsule.getInstance().getSerializedSize();
     boolean isSort = Args.getInstance().isOpenTransactionSort();
+    logger.info("Generate block check pendingSize="+pendingTransactions.size()+",repushsize="+rePushTransactions.size());
     while (pendingTransactions.size() > 0 || rePushTransactions.size() > 0) {
+      logger.info("Generate block check pendingSize="+pendingTransactions.size()+",repushsize="+rePushTransactions.size());
+
       long t3 = System.nanoTime();
       boolean fromPending = false;
       TransactionCapsule trx;
@@ -1472,6 +1491,7 @@ public class Manager {
         Metrics.gaugeInc(MetricKeys.Gauge.MANAGER_QUEUE, -1,
                 MetricLabels.Gauge.QUEUE_PENDING);
       }
+      logger.info("Generate block check pendingSize="+pendingTransactions.size()+",repushsize="+rePushTransactions.size());
 
       if (trx == null) {
         //  transaction may be removed by rePushLoop.
@@ -1480,6 +1500,8 @@ public class Manager {
         continue;
       }
       if (System.currentTimeMillis() > timeout) {
+        logger.info("Generate block Processing transaction time exceeds the producing time {}.",
+                System.currentTimeMillis());
         logger.warn("Processing transaction time exceeds the producing time {}.",
                 System.currentTimeMillis());
         break;
@@ -1487,6 +1509,8 @@ public class Manager {
 
       // check the block size
       if ((currentSize = currentSize + trx.getSerializedSize() + 3) > ChainConstant.BLOCK_SIZE) {
+        logger.info("Generate block Processing transaction size exceeds the block size {}.",
+                System.currentTimeMillis());
         postponedTrxCount++;
         break;
       }
@@ -1494,6 +1518,8 @@ public class Manager {
       //shielded transaction
       if (isShieldedTransaction(transaction)
           && shieldedTransCounts.incrementAndGet() > SHIELDED_TRANS_IN_BLOCK_COUNTS) {
+        logger.info("Generate block Processing shielded transaction size exceeds the shielded size {}.",
+                SHIELDED_TRANS_IN_BLOCK_COUNTS);
         continue;
       }
       //multi sign transaction
@@ -1510,6 +1536,8 @@ public class Manager {
       if (ownerAddressSet.contains(ownerAddress)) {
         trx.setVerified(false);
       }
+      logger.info("Generate block apply transaction begin {}.",
+              System.currentTimeMillis());
       // apply transaction
       try (ISession tmpSession = revokingStore.buildSession()) {
         accountStateCallBack.preExeTrans();
@@ -1521,6 +1549,7 @@ public class Manager {
         logger.error("Process trx {} failed when generating block {}, {}.", trx.getTransactionId(),
                 blockCapsule.getNum(), e.getMessage());
       }
+      logger.info("Generate block apply transaction end, pendingSize="+pendingTransactions.size()+",repushsize="+rePushTransactions.size());
     }
     blockCapsule.addAllTransactions(toBePacked);
     accountStateCallBack.executeGenerateFinish();

@@ -233,6 +233,7 @@ public class TronNetDelegate {
     }
     BlockId blockId = block.getBlockId();
     synchronized (blockLock) {
+      logger.info("Generate block tronNetDelegate lock succeed! ");
       try {
         if (freshBlockId.getIfPresent(blockId) == null) {
           if (block.getNum() <= getHeadBlockId().getNum()) {

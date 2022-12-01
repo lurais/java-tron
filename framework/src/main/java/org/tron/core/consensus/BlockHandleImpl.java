@@ -43,7 +43,9 @@ public class BlockHandleImpl implements BlockHandle {
   }
 
   public BlockCapsule produce(Miner miner, long blockTime, long timeout) {
+    logger.info("Generate block: BlockHandleImpl.produce invoked....");
     BlockCapsule blockCapsule = manager.generateBlock(miner, blockTime, timeout);
+    logger.info("Generate block: manager.generateBlock done!");
     if (blockCapsule == null) {
       return null;
     }
@@ -51,6 +53,7 @@ public class BlockHandleImpl implements BlockHandle {
       consensus.receiveBlock(blockCapsule);
       BlockMessage blockMessage = new BlockMessage(blockCapsule);
       tronNetService.broadcast(blockMessage);
+      logger.info("Generate block broadcast done! ");
       manager.pushBlock(blockCapsule);
     } catch (Exception e) {
       logger.error("Handle block {} failed.", blockCapsule.getBlockId().getString(), e);

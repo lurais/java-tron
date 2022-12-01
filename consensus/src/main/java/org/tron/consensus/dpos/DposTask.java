@@ -90,6 +90,7 @@ public class DposTask {
     dposService.getBlockHandle().setBlockWaitLock(true);
     try {
       synchronized (dposService.getBlockHandle().getLock()) {
+        logger.info("Generate block get manager lock succeed! ");
 
         long slot = dposSlot.getSlot(System.currentTimeMillis() + 50);
         if (slot == 0) {
@@ -112,7 +113,7 @@ public class DposTask {
         }
 
         BlockHeader.raw raw = blockCapsule.getInstance().getBlockHeader().getRawData();
-        logger.info("Produce block successfully, num: {}, time: {}, witness: {}, ID:{}, parentID:{}",
+        logger.info("Generate block Produce block successfully, num: {}, time: {}, witness: {}, ID:{}, parentID:{}",
                 raw.getNumber(),
                 new DateTime(raw.getTimestamp()),
                 ByteArray.toHexString(raw.getWitnessAddress().toByteArray()),
