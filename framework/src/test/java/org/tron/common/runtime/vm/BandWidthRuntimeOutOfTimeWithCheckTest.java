@@ -155,7 +155,7 @@ public class BandWidthRuntimeOutOfTimeWithCheckTest {
       trxCap.setResultCode(contractResult.OUT_OF_ENERGY);
       TransactionTrace trace = new TransactionTrace(trxCap, StoreFactory.getInstance(),
           new RuntimeImpl());
-      dbManager.consumeBandwidth(trxCap, trace);
+      dbManager.consumeBandwidth(trxCap, trace, false);
       BlockCapsule blockCapsule = null;
       trace.init(blockCapsule);
       trace.exec();
@@ -220,7 +220,7 @@ public class BandWidthRuntimeOutOfTimeWithCheckTest {
     TransactionCapsule trxCap = new TransactionCapsule(transaction);
     TransactionTrace trace = new TransactionTrace(trxCap, StoreFactory.getInstance(),
         new RuntimeImpl());
-    dbManager.consumeBandwidth(trxCap, trace);
+    dbManager.consumeBandwidth(trxCap, trace, false);
     BlockCapsule blockCapsule = null;
     trace.init(blockCapsule);
     trace.exec();

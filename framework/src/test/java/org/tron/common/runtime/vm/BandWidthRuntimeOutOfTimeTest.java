@@ -152,7 +152,7 @@ public class BandWidthRuntimeOutOfTimeTest {
       TransactionCapsule trxCap = new TransactionCapsule(transaction);
       TransactionTrace trace = new TransactionTrace(trxCap, StoreFactory.getInstance(),
           new RuntimeImpl());
-      dbManager.consumeBandwidth(trxCap, trace);
+      dbManager.consumeBandwidth(trxCap, trace, false);
       BlockCapsule blockCapsule = null;
       trace.init(blockCapsule);
       trace.exec();
@@ -215,7 +215,7 @@ public class BandWidthRuntimeOutOfTimeTest {
     TransactionCapsule trxCap = new TransactionCapsule(transaction);
     TransactionTrace trace = new TransactionTrace(trxCap, StoreFactory.getInstance(),
         new RuntimeImpl());
-    dbManager.consumeBandwidth(trxCap, trace);
+    dbManager.consumeBandwidth(trxCap, trace, false);
     BlockCapsule blockCapsule = null;
     trace.init(blockCapsule);
     trace.exec();

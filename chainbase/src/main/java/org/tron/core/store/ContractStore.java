@@ -12,6 +12,7 @@ import org.tron.core.db.TronStoreWithRevoking;
 import org.tron.protos.contract.SmartContractOuterClass.SmartContract;
 
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j(topic = "DB")
 @Component
@@ -22,9 +23,20 @@ public class ContractStore extends TronStoreWithRevoking<ContractCapsule> {
     super(dbName);
   }
 
+  public static AtomicLong timer = new AtomicLong(0);
+
+
   @Override
   public ContractCapsule get(byte[] key) {
-    return getUnchecked(key);
+    long start = System.currentTimeMillis();
+    try {
+      return getUnchecked(key);
+    }finally {
+      long time = System.currentTimeMillis()-start;
+      if(time > 0) {
+          timer.addAndGet(time);
+      }
+    }
   }
 
   @Override

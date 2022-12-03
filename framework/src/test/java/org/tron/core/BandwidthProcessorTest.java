@@ -283,7 +283,7 @@ public class BandwidthProcessorTest {
     TransactionResultCapsule ret = new TransactionResultCapsule();
     TransactionTrace trace = new TransactionTrace(trx, StoreFactory
         .getInstance(), new RuntimeImpl());
-    dbManager.consumeBandwidth(trx, trace);
+    dbManager.consumeBandwidth(trx, trace, false);
 
     AccountCapsule ownerCapsuleNew = chainBaseManager.getAccountStore()
         .get(ByteArray.fromHexString(OWNER_ADDRESS));
@@ -304,7 +304,7 @@ public class BandwidthProcessorTest {
     chainBaseManager.getDynamicPropertiesStore()
         .saveLatestBlockHeaderTimestamp(1526691038000L); // + 12h
 
-    dbManager.consumeBandwidth(trx, trace);
+    dbManager.consumeBandwidth(trx, trace, false);
     ownerCapsuleNew = chainBaseManager.getAccountStore()
         .get(ByteArray.fromHexString(OWNER_ADDRESS));
 
@@ -343,7 +343,7 @@ public class BandwidthProcessorTest {
     TransactionResultCapsule ret = new TransactionResultCapsule();
     TransactionTrace trace = new TransactionTrace(trx, StoreFactory
         .getInstance(), new RuntimeImpl());
-    dbManager.consumeBandwidth(trx, trace);
+    dbManager.consumeBandwidth(trx, trace, false);
 
     AccountCapsule ownerCapsuleNew = chainBaseManager.getAccountStore()
         .get(ByteArray.fromHexString(OWNER_ADDRESS));
@@ -372,7 +372,7 @@ public class BandwidthProcessorTest {
     chainBaseManager.getDynamicPropertiesStore()
         .saveLatestBlockHeaderTimestamp(1526691038000L); // + 12h
 
-    dbManager.consumeBandwidth(trx, trace);
+    dbManager.consumeBandwidth(trx, trace, false);
 
     ownerCapsuleNew = chainBaseManager.getAccountStore()
         .get(ByteArray.fromHexString(OWNER_ADDRESS));
@@ -419,7 +419,7 @@ public class BandwidthProcessorTest {
     TransactionResultCapsule ret = new TransactionResultCapsule();
     TransactionTrace trace = new TransactionTrace(trx, StoreFactory
         .getInstance(), new RuntimeImpl());
-    dbManager.consumeBandwidth(trx, trace);
+    dbManager.consumeBandwidth(trx, trace, false);
 
     AccountCapsule ownerCapsuleNew = chainBaseManager.getAccountStore()
         .get(ByteArray.fromHexString(OWNER_ADDRESS));
@@ -446,7 +446,7 @@ public class BandwidthProcessorTest {
     chainBaseManager.getDynamicPropertiesStore()
         .saveLatestBlockHeaderTimestamp(1526691038000L); // + 12h
 
-    dbManager.consumeBandwidth(trx, trace);
+    dbManager.consumeBandwidth(trx, trace, false);
 
     ownerCapsuleNew = chainBaseManager.getAccountStore()
         .get(ByteArray.fromHexString(OWNER_ADDRESS));
@@ -487,7 +487,7 @@ public class BandwidthProcessorTest {
     TransactionResultCapsule ret = new TransactionResultCapsule();
     TransactionTrace trace = new TransactionTrace(trx, StoreFactory
         .getInstance(), new RuntimeImpl());
-    dbManager.consumeBandwidth(trx, trace);
+    dbManager.consumeBandwidth(trx, trace, false);
 
     AccountCapsule ownerCapsuleNew = chainBaseManager.getAccountStore()
         .get(ByteArray.fromHexString(OWNER_ADDRESS));
@@ -506,7 +506,7 @@ public class BandwidthProcessorTest {
     chainBaseManager.getDynamicPropertiesStore()
         .saveLatestBlockHeaderTimestamp(1526691038000L); // + 12h
 
-    dbManager.consumeBandwidth(trx, trace);
+    dbManager.consumeBandwidth(trx, trace, false);
 
     ownerCapsuleNew = chainBaseManager.getAccountStore()
         .get(ByteArray.fromHexString(OWNER_ADDRESS));
@@ -550,7 +550,7 @@ public class BandwidthProcessorTest {
     TransactionResultCapsule ret = new TransactionResultCapsule();
     TransactionTrace trace = new TransactionTrace(trx, StoreFactory
         .getInstance(), new RuntimeImpl());
-    dbManager.consumeBandwidth(trx, trace);
+    dbManager.consumeBandwidth(trx, trace, false);
 
     AccountCapsule ownerCapsuleNew = chainBaseManager.getAccountStore()
         .get(ByteArray.fromHexString(OWNER_ADDRESS));
@@ -568,7 +568,7 @@ public class BandwidthProcessorTest {
     Assert.assertEquals(transactionFee, trace.getReceipt().getNetFee());
 
     chainBaseManager.getAccountStore().delete(ByteArray.fromHexString(TO_ADDRESS));
-    dbManager.consumeBandwidth(trx, trace);
+    dbManager.consumeBandwidth(trx, trace, false);
   }
 
   /**

@@ -164,7 +164,7 @@ public class BandWidthRuntimeWithCheckTest {
       TransactionCapsule trxCap = new TransactionCapsule(transaction);
       TransactionTrace trace = new TransactionTrace(trxCap, StoreFactory.getInstance(),
           new RuntimeImpl());
-      dbManager.consumeBandwidth(trxCap, trace);
+      dbManager.consumeBandwidth(trxCap, trace, false);
       BlockCapsule blockCapsule = null;
 
       trace.init(blockCapsule);
@@ -202,7 +202,7 @@ public class BandWidthRuntimeWithCheckTest {
       trxCap.setResultCode(contractResult.SUCCESS);
       TransactionTrace trace = new TransactionTrace(trxCap, StoreFactory.getInstance(),
           new RuntimeImpl());
-      dbManager.consumeBandwidth(trxCap, trace);
+      dbManager.consumeBandwidth(trxCap, trace, false);
       long bandWidth = trxCap.getSerializedSize() + Constant.MAX_RESULT_SIZE_IN_TX;
       BlockCapsule blockCapsule = null;
       trace.init(blockCapsule);
@@ -269,7 +269,7 @@ public class BandWidthRuntimeWithCheckTest {
     trxCap.setResultCode(contractResult.SUCCESS);
     TransactionTrace trace = new TransactionTrace(trxCap, StoreFactory.getInstance(),
         new RuntimeImpl());
-    dbManager.consumeBandwidth(trxCap, trace);
+    dbManager.consumeBandwidth(trxCap, trace, false);
     BlockCapsule blockCapsule = null;
 
     trace.init(blockCapsule);

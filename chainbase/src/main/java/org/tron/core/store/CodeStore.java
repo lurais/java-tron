@@ -8,6 +8,8 @@ import org.springframework.stereotype.Component;
 import org.tron.core.capsule.CodeCapsule;
 import org.tron.core.db.TronStoreWithRevoking;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 @Slf4j(topic = "DB")
 @Component
 public class CodeStore extends TronStoreWithRevoking<CodeCapsule> {
@@ -17,9 +19,20 @@ public class CodeStore extends TronStoreWithRevoking<CodeCapsule> {
     super(dbName);
   }
 
+  public static AtomicLong timer = new AtomicLong(0);
+
+
   @Override
   public CodeCapsule get(byte[] key) {
-    return getUnchecked(key);
+    long start = System.currentTimeMillis();
+    try{
+      return getUnchecked(key);
+    }finally {
+      long time = System.currentTimeMillis()-start;
+      if(time > 0) {
+        timer.addAndGet(time);
+      }
+    }
   }
 
   public long getTotalCodes() {
