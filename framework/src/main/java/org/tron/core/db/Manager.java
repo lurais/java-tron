@@ -16,7 +16,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -35,6 +34,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import javax.annotation.PostConstruct;
@@ -782,7 +782,7 @@ public class Manager {
           }
 
           try (ISession tmpSession = revokingStore.buildSession()) {
-            processTransaction(trx, null, null);
+            processTransaction(trx, null, false);
             trx.setTrxTrace(null);
             pendingTransactions.add(trx);
             Metrics.gaugeInc(MetricKeys.Gauge.MANAGER_QUEUE, 1,
@@ -833,11 +833,59 @@ public class Manager {
     }
   }
 
-  public void consumeBandwidth(TransactionCapsule trx, TransactionTrace trace)
-          throws ContractValidateException, AccountResourceInsufficientException,
-          TooBigTransactionResultException {
-    BandwidthProcessor processor = new BandwidthProcessor(chainBaseManager);
-    processor.consume(trx, trace);
+  public void consumeMemoFee(TransactionCapsule trx, TransactionTrace trace)
+      throws AccountResourceInsufficientException {
+    if (trx.getInstance().getRawData().getData().isEmpty()) {
+      // no memo
+      return;
+    }
+
+    long fee = getDynamicPropertiesStore().getMemoFee();
+    if (fee == 0) {
+      return;
+    }
+
+    List<Contract> contracts = trx.getInstance().getRawData().getContractList();
+    for (Contract contract : contracts) {
+      byte[] address = TransactionCapsule.getOwner(contract);
+      AccountCapsule accountCapsule = getAccountStore().get(address);
+      try {
+        if (accountCapsule != null) {
+          adjustBalance(getAccountStore(), accountCapsule, -fee);
+
+          if (getDynamicPropertiesStore().supportBlackHoleOptimization()) {
+            getDynamicPropertiesStore().burnTrx(fee);
+          } else {
+            adjustBalance(getAccountStore(), this.getAccountStore().getBlackhole(), +fee);
+          }
+        }
+      } catch (BalanceInsufficientException e) {
+        throw new AccountResourceInsufficientException(
+            String.format("account %s insufficient balance[%d] to memo fee",
+                StringUtil.encode58Check(address), fee));
+      }
+    }
+
+    trace.getReceipt().setMemoFee(fee);
+  }
+
+  public void consumeBandwidth(TransactionCapsule trx, TransactionTrace trace, boolean isPush)
+      throws ContractValidateException, AccountResourceInsufficientException,
+      TooBigTransactionResultException {
+    long start = System.nanoTime();
+    try {
+     resetDBTimer();
+     BandwidthProcessor processor = new BandwidthProcessor(chainBaseManager);
+     processor.consume(trx, trace);
+   }finally {
+        if(isPush){
+          Manager.consume.addAndGet(System.nanoTime()-start);
+          Manager.consumedb.addAndGet(getDBTimer());
+        }else{
+          Manager.notPushconsume.addAndGet(System.nanoTime()-start);
+          Manager.notPushconsumedb.addAndGet(getDBTimer());
+        }
+   }
   }
 
 
@@ -881,21 +929,21 @@ public class Manager {
   }
 
   private void applyBlock(BlockCapsule block) throws ContractValidateException,
-          ContractExeException, ValidateSignatureException, AccountResourceInsufficientException,
-          TransactionExpirationException, TooBigTransactionException, DupTransactionException,
-          TaposException, ValidateScheduleException, ReceiptCheckErrException,
-          VMIllegalException, TooBigTransactionResultException,
-          ZksnarkException, BadBlockException, EventBloomException {
-    applyBlock(block, block.getTransactions());
+      ContractExeException, ValidateSignatureException, AccountResourceInsufficientException,
+      TransactionExpirationException, TooBigTransactionException, DupTransactionException,
+      TaposException, ValidateScheduleException, ReceiptCheckErrException,
+      VMIllegalException, TooBigTransactionResultException,
+      ZksnarkException, BadBlockException, EventBloomException {
+    applyBlock(block, block.getTransactions(),Boolean.TRUE);
   }
 
-  private void applyBlock(BlockCapsule block, List<TransactionCapsule> txs)
-          throws ContractValidateException, ContractExeException, ValidateSignatureException,
-          AccountResourceInsufficientException, TransactionExpirationException,
-          TooBigTransactionException, DupTransactionException, TaposException,
-          ValidateScheduleException, ReceiptCheckErrException, VMIllegalException,
-          TooBigTransactionResultException, ZksnarkException, BadBlockException, EventBloomException {
-    processBlock(block, txs);
+  private void applyBlock(BlockCapsule block, List<TransactionCapsule> txs,boolean isPush)
+      throws ContractValidateException, ContractExeException, ValidateSignatureException,
+      AccountResourceInsufficientException, TransactionExpirationException,
+      TooBigTransactionException, DupTransactionException, TaposException,
+      ValidateScheduleException, ReceiptCheckErrException, VMIllegalException,
+      TooBigTransactionResultException, ZksnarkException, BadBlockException, EventBloomException {
+    processBlock(block, txs,isPush);
     chainBaseManager.getBlockStore().put(block.getBlockId().getBytes(), block);
     chainBaseManager.getBlockIndexStore().put(block.getBlockId());
     if (block.getTransactions().size() != 0) {
@@ -1061,6 +1109,27 @@ public class Manager {
     return txs;
   }
 
+  public static AtomicLong consume,consumedb ,traceExec,traceExecdb,traceFinal,traceFinaldb,sign,signdb=new AtomicLong(0);
+  public static AtomicLong notPushconsume,notPushconsumedb ,notPushtraceExec,notPushtraceExecdb,notPushtraceFinal,notPushtraceFinaldb,notPushsign,notPushsigndb=new AtomicLong(0);
+
+  public static void resetDBMetric(){
+    consume = new AtomicLong(0);
+    consumedb = new AtomicLong(0);
+    traceExec= new AtomicLong(0);
+    traceExecdb= new AtomicLong(0);
+    traceFinal= new AtomicLong(0);
+    traceFinaldb=new AtomicLong(0);
+    sign = new AtomicLong(0);
+    signdb = new AtomicLong(0);
+    notPushconsume = new AtomicLong(0);
+    notPushconsumedb = new AtomicLong(0);
+    notPushtraceExec= new AtomicLong(0);
+    notPushtraceExecdb= new AtomicLong(0);
+    notPushtraceFinal= new AtomicLong(0);
+    notPushtraceFinaldb=new AtomicLong(0);
+    notPushsign = new AtomicLong(0);
+    notPushsigndb = new AtomicLong(0);
+  }
   /**
    * save a block.
    */
@@ -1179,8 +1248,7 @@ public class Manager {
 
               long oldSolidNum =
                       chainBaseManager.getDynamicPropertiesStore().getLatestSolidifiedBlockNum();
-
-              applyBlock(newBlock, txs);
+              applyBlock(newBlock, txs,true);
               tmpSession.commit();
 
               MarketAccountStore marketAccountStore = chainBaseManager.getMarketAccountStore();
@@ -1221,9 +1289,9 @@ public class Manager {
         long cost = System.currentTimeMillis() - start;
         MetricsUtil.meterMark(MetricsKey.BLOCKCHAIN_BLOCK_PROCESS_TIME, cost);
 
-        logger.info("pushBlock block number:{}, cost/txs:{}/{} {}",
-                block.getNum(), cost, block.getTransactions().size(), cost > 1000);
-
+        logger.info("PushBlock block number: {}, cost/txs: {}/{} {}, cosume:{},consumedb:{},trexec:{},trexecdb:{},trfi:{},trfidb:{},sign:{},signdb:{},notPushcosume:{},notPushconsumedb:{},notPushtrexec:{},notPushtrexecdb:{},notPushtrfi:{},notPushtrfidb:{},notPushsign:{},notPushsigndb:{}.",
+                block.getNum(), cost, block.getTransactions().size(), cost > 1000,consume,consumedb,traceExec,traceExecdb,traceFinal,traceFinaldb,sign,signdb,notPushconsume,notPushconsumedb,notPushtraceExec,notPushtraceExecdb,notPushtraceFinal,notPushtraceFinaldb,notPushsign,notPushsigndb);
+        resetDBMetric();
         Metrics.histogramObserve(timer);
       }
     } finally {
@@ -1281,12 +1349,11 @@ public class Manager {
   /**
    * Process transaction.
    */
-  public TransactionInfo processTransaction(final TransactionCapsule trxCap, BlockCapsule blockCap,
-                                            Map<String, Long> phase2cost)
-          throws ValidateSignatureException, ContractValidateException, ContractExeException,
-          AccountResourceInsufficientException, TransactionExpirationException,
-          TooBigTransactionException, TooBigTransactionResultException,
-          DupTransactionException, TaposException, ReceiptCheckErrException, VMIllegalException {
+  public TransactionInfo processTransaction(final TransactionCapsule trxCap, BlockCapsule blockCap, boolean isPush)
+      throws ValidateSignatureException, ContractValidateException, ContractExeException,
+      AccountResourceInsufficientException, TransactionExpirationException,
+      TooBigTransactionException, TooBigTransactionResultException,
+      DupTransactionException, TaposException, ReceiptCheckErrException, VMIllegalException {
     if (trxCap == null) {
       return null;
     }
@@ -1331,23 +1398,38 @@ public class Manager {
             new RuntimeImpl());
     trxCap.setTrxTrace(trace);
 
-    consumeBandwidth(trxCap, trace);
+    consumeBandwidth(trxCap, trace,isPush);
     consumeMultiSignFee(trxCap, trace);
     long t5 = System.nanoTime();
 
     trace.init(blockCap, eventPluginLoaded);
     trace.checkIsConstant();
-
-    long t6 = System.nanoTime();
+    resetDBTimer();
+    long start1 = System.nanoTime();
     trace.exec();
-    long t7 = System.nanoTime();
+    if(isPush){
+      Manager.traceExec.addAndGet(System.nanoTime()-start1);
+      Manager.traceExecdb.addAndGet(getDBTimer());
+    }else{
+      Manager.notPushtraceExec.addAndGet(System.nanoTime()-start1);
+      Manager.notPushtraceExecdb.addAndGet(getDBTimer());
+    }
 
     if (Objects.nonNull(blockCap)) {
       trace.setResult();
       if (trace.checkNeedRetry()) {
         trace.init(blockCap, eventPluginLoaded);
         trace.checkIsConstant();
+        resetDBTimer();
+        long start2 = System.nanoTime();
         trace.exec();
+        if(isPush){
+          Manager.traceExec.addAndGet(System.nanoTime()-start2);
+          Manager.traceExecdb.addAndGet(getDBTimer());
+        }else{
+          Manager.notPushtraceExec.addAndGet(System.nanoTime()-start2);
+          Manager.notPushtraceExecdb.addAndGet(getDBTimer());
+        }
         trace.setResult();
         logger.info("Retry result when push: {}, for tx id: {}, tx resultCode in receipt: {}.",
                 blockCap.hasWitnessSignature(), txId, trace.getReceipt().getResult());
@@ -1357,8 +1439,16 @@ public class Manager {
       }
     }
 
+    long start3 = System.nanoTime();
+    resetDBTimer();
     trace.finalization();
-    long t8 = System.nanoTime();
+    if(isPush){
+     Manager.traceFinal.addAndGet(System.nanoTime()-start3);
+     Manager.traceFinaldb.addAndGet(getDBTimer());
+    }else{
+      Manager.notPushtraceFinal.addAndGet(System.nanoTime()-start3);
+      Manager.notPushtraceFinaldb.addAndGet(getDBTimer());
+    }
 
     if (getDynamicPropertiesStore().supportVM()) {
       trxCap.setResult(trace.getTransactionContext());
@@ -1518,7 +1608,7 @@ public class Manager {
       try (ISession tmpSession = revokingStore.buildSession()) {
         long t5 = System.nanoTime();
         accountStateCallBack.preExeTrans();
-        TransactionInfo result = processTransaction(trx, blockCapsule, phase2cost);
+        TransactionInfo result = processTransaction(trx, blockCapsule, true);
         accountStateCallBack.exeTransFinish();
         tmpSession.merge();
         blockCapsule.addTransaction(trx);
@@ -1595,15 +1685,29 @@ public class Manager {
     return chainBaseManager.getBlockStore();
   }
 
+  public void resetDBTimer(){
+    AccountStore.timer = new AtomicLong(0);
+    StorageRowStore.timer = new AtomicLong(0);
+    CodeStore.timer = new AtomicLong(0);
+    ContractStore.timer = new AtomicLong(0);
+  }
+
+  public long getDBTimer(){
+    return AccountStore.timer.longValue() + StorageRowStore.timer.longValue()+CodeStore.timer.longValue()+ContractStore.timer.longValue();
+  }
+
+
+
+
   /**
    * process block.
    */
-  private void processBlock(BlockCapsule block, List<TransactionCapsule> txs)
-          throws ValidateSignatureException, ContractValidateException, ContractExeException,
-          AccountResourceInsufficientException, TaposException, TooBigTransactionException,
-          DupTransactionException, TransactionExpirationException, ValidateScheduleException,
-          ReceiptCheckErrException, VMIllegalException, TooBigTransactionResultException,
-          ZksnarkException, BadBlockException, EventBloomException {
+  private void processBlock(BlockCapsule block, List<TransactionCapsule> txs, boolean isPush)
+      throws ValidateSignatureException, ContractValidateException, ContractExeException,
+      AccountResourceInsufficientException, TaposException, TooBigTransactionException,
+      DupTransactionException, TransactionExpirationException, ValidateScheduleException,
+      ReceiptCheckErrException, VMIllegalException, TooBigTransactionResultException,
+      ZksnarkException, BadBlockException, EventBloomException {
     // todo set revoking db max size.
 
     // checkWitness
@@ -1617,11 +1721,21 @@ public class Manager {
     chainBaseManager.getDynamicPropertiesStore().saveBlockEnergyUsage(0);
     //parallel check sign
     if (!block.generatedByMyself) {
+      resetDBTimer();
+      long tv = System.nanoTime();
       try {
         preValidateTransactionSign(txs);
       } catch (InterruptedException e) {
         logger.error("Parallel check sign interrupted exception! block info: {}.", block, e);
         Thread.currentThread().interrupt();
+      }finally {
+        if(isPush){
+          Manager.sign.addAndGet(System.nanoTime()-tv);
+          Manager.signdb.addAndGet(getDBTimer());
+        }else{
+          Manager.notPushsign.addAndGet(System.nanoTime()-tv);
+          Manager.notPushsigndb.addAndGet(getDBTimer());
+        }
       }
     }
 
@@ -1630,20 +1744,13 @@ public class Manager {
     try {
       merkleContainer.resetCurrentMerkleTree();
       accountStateCallBack.preExecute(block);
-      Map<String, Long> phase2cost = new HashMap<>();
       for (TransactionCapsule transactionCapsule : block.getTransactions()) {
         transactionCapsule.setBlockNum(block.getNum());
         if (block.generatedByMyself) {
           transactionCapsule.setVerified(true);
         }
         accountStateCallBack.preExeTrans();
-        TransactionInfo result = null;
-        try {
-          result = processTransaction(transactionCapsule, block, phase2cost);
-        } catch (ContractValidateException e) {
-          logger.error("process tx failed, id: {}", transactionCapsule.getTransactionId().toString(), e);
-          throw new ContractValidateException(transactionCapsule.getTransactionId().toString(), e);
-        }
+        TransactionInfo result = processTransaction(transactionCapsule, block,isPush);
         accountStateCallBack.exeTransFinish();
         if (Objects.nonNull(result)) {
           transactionRetCapsule.addTransactionInfo(result);

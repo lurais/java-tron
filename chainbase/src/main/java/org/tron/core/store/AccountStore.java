@@ -2,6 +2,7 @@ package org.tron.core.store;
 
 import com.google.protobuf.ByteString;
 import com.typesafe.config.ConfigObject;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ArrayUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,7 +20,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
+import java.util.concurrent.atomic.AtomicLong;
 
+@Slf4j(topic="DB")
 @Component
 public class AccountStore extends TronStoreWithRevoking<AccountCapsule> {
 
@@ -36,6 +39,8 @@ public class AccountStore extends TronStoreWithRevoking<AccountCapsule> {
 
   @Autowired
   private DynamicPropertiesStore dynamicPropertiesStore;
+
+  public static AtomicLong timer = new AtomicLong(0);
 
   @Autowired
   private AccountStore(@Value("account") String dbName) {
@@ -54,8 +59,16 @@ public class AccountStore extends TronStoreWithRevoking<AccountCapsule> {
 
   @Override
   public AccountCapsule get(byte[] key) {
-    byte[] value = revokingDB.getUnchecked(key);
-    return ArrayUtils.isEmpty(value) ? null : new AccountCapsule(value);
+    long start = System.nanoTime();
+    try {
+      byte[] value = revokingDB.getUnchecked(key);
+      return ArrayUtils.isEmpty(value) ? null : new AccountCapsule(value);
+    }finally {
+      long time = System.nanoTime()-start;
+      if(time > 0) {
+        timer.addAndGet(time);
+      }
+    }
   }
 
   @Override
