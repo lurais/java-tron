@@ -1,7 +1,13 @@
 package org.tron.plugins;
 
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import me.tongfei.progressbar.ProgressBar;
 import org.apache.commons.lang3.StringUtils;
 
@@ -32,11 +38,14 @@ public class DbExpand implements Callable<Integer> {
     private static final String DEFAULT_DB_DIRECTORY = "database";
     private static final String NAME_CONFIG_KEY = "name";
     private static final String PATH_CONFIG_KEY = "path";
+    private static final String SECOND_PATH_CONFIG_KEY = "secondPath";
     private static final String RATE_CONFIG_KEY = "rate";
-    private static final int BATCH = 256;
+    private static final String OP_CONFIG_KEY = "op";// 0直接膨胀 1混合 2先冷后热
+    private static final int BATCH = 4096;
     private Random random = new Random(System.currentTimeMillis());
     public static final byte ADD_PRE_FIX_BYTE_MAINNET = (byte) 0x41;
     private static Set<String> structureNames = new HashSet<>();
+
 
 
 
@@ -70,51 +79,103 @@ public class DbExpand implements Callable<Integer> {
             spec.commandLine().usage(System.out);
             return 0;
         }
-        List<? extends Config> dbs = config.getConfigList(PROPERTIES_CONFIG_KEY).stream()
+        List<? extends Config> dbConfigs = config.getConfigList(PROPERTIES_CONFIG_KEY).stream()
                 .filter(c -> c.hasPath(NAME_CONFIG_KEY) && c.hasPath(PATH_CONFIG_KEY) && c.hasPath(RATE_CONFIG_KEY))
                 .collect(Collectors.toList());
         long start = System.currentTimeMillis();
-        ProgressBar.wrap(dbs.stream(), "Expand task").forEach(this::run);
+        dbConfigs.parallelStream().forEach(this::run);
+        //ProgressBar.wrap(dbConfigs.stream(), "Expand task").forEach(this::run);
         long cost = System.currentTimeMillis() - start;
-        spec.commandLine().getOut().println(String.format("Expand db done,cost:%s seconds", cost / 1000));
+        spec.commandLine().getOut().println(String.format("Expand all db done,cost:%s seconds", cost / 1000));
         return 0;
     }
 
     private void run(Config c) {
+        int op = c.getInt(OP_CONFIG_KEY);
         int rate = c.getInt(RATE_CONFIG_KEY);
         String name = c.getString(NAME_CONFIG_KEY);
         String dbPath = config.hasPath(DB_DIRECTORY_CONFIG_KEY)
                 ? config.getString(DB_DIRECTORY_CONFIG_KEY) : DEFAULT_DB_DIRECTORY;
         long start = System.currentTimeMillis();
-        DB levelDb = null;
+        DB levelDb = null, secondDb = null;
         try {
             levelDb = openLevelDb(Paths.get(database.toString(),dbPath,c.getString(PATH_CONFIG_KEY)));
+            secondDb = parseSecondDb(op,c,dbPath);
         } catch (Exception e) {
-            spec.commandLine().getErr().println(String.format("Open db %s error %s."
+            spec.commandLine().getErr().println(String.format("Open db %s error."
                     , name, e.getStackTrace()));
             e.printStackTrace();
         }
-        doExpand(levelDb, name, rate);
+        spec.commandLine().getOut().println(String.format("Expand db %s begin......", name));
+        doExpand(levelDb,secondDb, name, rate, op);
         long cost = System.currentTimeMillis() - start;
-        spec.commandLine().getOut().println(String.format("Expand all db %s done,cost:%s seconds", name, cost / 1000.0));
+        spec.commandLine().getOut().println(String.format("Expand db %s done,cost:%s seconds", name, cost / 1000.0));
     }
 
-    private void doExpand(DB levelDb, String name, int rate) {
+    private void mergeDb(DB originDb, DB targetDb) {
+        List<byte[]> keys = new ArrayList<>(BATCH);
+        List<byte[]> values = new ArrayList<>(BATCH);
+        try (DBIterator levelIterator = originDb.iterator(
+            new org.iq80.leveldb.ReadOptions().fillCache(false))) {
+            JniDBFactory.pushMemoryPool(2048 * 2048);
+            levelIterator.seekToFirst();
+
+            while (levelIterator.hasNext()) {
+                Map.Entry<byte[], byte[]> entry = levelIterator.next();
+                keys.add(entry.getKey());
+                values.add(entry.getValue());
+                if (keys.size() >= BATCH) {
+                    try {
+                        batchInsert(targetDb, keys, values);
+                    } catch (Exception e) {
+                        spec.commandLine().getErr().println(String.format("Batch insert kv error %s."
+                            , e.getStackTrace()));
+                    }
+                }
+            }
+
+            if (!keys.isEmpty()) {
+                try {
+                    batchInsert(targetDb, keys, values);
+                } catch (Exception e) {
+                    spec.commandLine().getErr().println(String.format("Batch insert kv error %s."
+                        , e.getStackTrace()));
+                }
+            }
+        } catch (Exception e) {
+            spec.commandLine().getErr().println(String.format("Merge error %s."
+                , e.getStackTrace()));
+        } finally {
+            spec.commandLine().getOut().println("Merge db done");
+        }
+    }
+
+    private DB parseSecondDb(int op, Config c, String dbPath) throws Exception {
+        //直接膨胀
+        if(op==0){
+            return null;
+        }
+        //先冷后热（扩展冷库，merge）
+        //混合，直接新库 SECOND_PATH_CONFIG_KEY
+        return openLevelDb(Paths.get(database.toString(),dbPath,c.getString(NAME_CONFIG_KEY)+"_second"));
+    }
+
+    private void doExpand(DB levelDb,DB secondDb, String name, int rate,int op) {
         long expandKeyCount = 0;
         List<byte[]> keys = new ArrayList<>(BATCH);
         List<byte[]> values = new ArrayList<>(BATCH);
         try (DBIterator levelIterator = levelDb.iterator(
                 new org.iq80.leveldb.ReadOptions().fillCache(false))) {
-            JniDBFactory.pushMemoryPool(1024 * 1024);
+            JniDBFactory.pushMemoryPool(2048 * 2048);
             levelIterator.seekToFirst();
 
             while (levelIterator.hasNext()) {
                 Map.Entry<byte[], byte[]> entry = levelIterator.next();
-                addShuffleKv(name,entry, rate, keys, values);
+                addShuffleKv(op,name,entry, rate, keys, values);
                 expandKeyCount += rate;
                 if (keys.size() >= BATCH) {
                     try {
-                        batchInsert(levelDb, keys, values);
+                        batchInsert(op==0?levelDb:secondDb, keys, values);
                     } catch (Exception e) {
                         spec.commandLine().getErr().println(String.format("Batch insert shuffled kv to %s error %s."
                                 , name, e.getStackTrace()));
@@ -124,11 +185,14 @@ public class DbExpand implements Callable<Integer> {
 
             if (!keys.isEmpty()) {
                 try {
-                    batchInsert(levelDb, keys, values);
+                    batchInsert(op==0?levelDb:secondDb, keys, values);
                 } catch (Exception e) {
                     spec.commandLine().getErr().println(String.format("Batch insert shuffled kv to %s error %s."
                             , name, e.getStackTrace()));
                 }
+            }
+            if(op==2){
+                mergeDb(levelDb,secondDb);
             }
         } catch (Exception e) {
             spec.commandLine().getErr().println(String.format("Expand %s error %s."
@@ -136,6 +200,9 @@ public class DbExpand implements Callable<Integer> {
         } finally {
             try {
                 levelDb.close();
+                if(secondDb!=null) {
+                    secondDb.close();
+                }
                 JniDBFactory.popMemoryPool();
             } catch (Exception e1) {
                 spec.commandLine().getErr().println(String.format("Close %s error %s."
@@ -145,12 +212,18 @@ public class DbExpand implements Callable<Integer> {
         }
     }
 
-    private void addShuffleKv(String name ,Map.Entry<byte[], byte[]> entry, int rate, List<byte[]> keys, List<byte[]> values) {
+    private void addShuffleKv(int op, String name, Map.Entry<byte[], byte[]> entry, int rate,
+                              List<byte[]> keys, List<byte[]> values) {
         for (int i = rate; i > 0; i--) {
             byte[] key = structureKey(name) ? generateStructure(name): shuffleBytes(entry.getKey());
             byte[] value = entry.getValue();
             keys.add(key);
             values.add(value);
+        }
+        // 混合
+        if(op==1){
+            keys.add(entry.getKey());
+            values.add(entry.getValue());
         }
     }
 
