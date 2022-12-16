@@ -129,7 +129,7 @@ public class DbExpand implements Callable<Integer> {
                         batchInsert(targetDb, keys, values);
                     } catch (Exception e) {
                         spec.commandLine().getErr().println(String.format("Batch insert kv error %s."
-                            , e.getStackTrace()));
+                            , e.getMessage()));
                     }
                 }
             }
@@ -139,12 +139,12 @@ public class DbExpand implements Callable<Integer> {
                     batchInsert(targetDb, keys, values);
                 } catch (Exception e) {
                     spec.commandLine().getErr().println(String.format("Batch insert kv error %s."
-                        , e.getStackTrace()));
+                        , e.getMessage()));
                 }
             }
         } catch (Exception e) {
             spec.commandLine().getErr().println(String.format("Merge error %s."
-                , e.getStackTrace()));
+                , e.getMessage()));
         } finally {
             spec.commandLine().getOut().println("Merge db done");
         }
