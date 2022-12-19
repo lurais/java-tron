@@ -41,7 +41,7 @@ public class DbExpand implements Callable<Integer> {
     private static final String SECOND_PATH_CONFIG_KEY = "secondPath";
     private static final String RATE_CONFIG_KEY = "rate";
     private static final String OP_CONFIG_KEY = "op";// 0直接膨胀 1混合 2先冷后热
-    private static final int BATCH = 4096;
+    private static final int BATCH = 1000;
     private Random random = new Random(System.currentTimeMillis());
     public static final byte ADD_PRE_FIX_BYTE_MAINNET = (byte) 0x41;
     private static Set<String> structureNames = new HashSet<>();
@@ -67,6 +67,8 @@ public class DbExpand implements Callable<Integer> {
 
     @CommandLine.Option(names = {"-h", "--help"}, help = true, description = "display a help message")
     boolean help;
+
+    Random r = new Random();
 
 
     static {
@@ -107,9 +109,179 @@ public class DbExpand implements Callable<Integer> {
             e.printStackTrace();
         }
         spec.commandLine().getOut().println(String.format("Expand db %s begin......", name));
-        doExpand(levelDb,secondDb, name, rate, op);
+        if(op == 3){
+            doTestTopGet(levelDb,secondDb,name,rate);
+        }else if(op==4) {
+            doExpandReverse(levelDb,secondDb,name,rate);
+        }else if(op==5) {
+            doTestGetInSecond(levelDb,levelDb,name);
+        } else {
+            doExpand(levelDb, secondDb, name, rate, op);
+        }
         long cost = System.currentTimeMillis() - start;
         spec.commandLine().getOut().println(String.format("Expand db %s done,cost:%s seconds", name, cost / 1000.0));
+    }
+
+    private void doExpandReverse(DB levelDb, DB secondDb, String name, int rate) {
+        mergeDbReverse(levelDb,secondDb);
+        spec.commandLine().getOut().println(String.format("merge db %s done", name));
+        doTestGetInSecond(levelDb,secondDb,name);
+    }
+
+    private void doTestGetInSecond(DB levelDb, DB secondDb, String name) {
+        long allStat = 0;
+        List<byte[]> keys = new ArrayList<>(BATCH);
+        List<byte[]> values = new ArrayList<>(BATCH);
+
+        List<byte[]> statKeys = new ArrayList<>(BATCH);
+        try (DBIterator levelIterator = levelDb.iterator(
+            new org.iq80.leveldb.ReadOptions().fillCache(false))) {
+            JniDBFactory.pushMemoryPool(2048 * 2048);
+            levelIterator.seekToFirst();
+
+            while (levelIterator.hasNext()) {
+                Map.Entry<byte[], byte[]> entry = levelIterator.next();
+                keys.add(entry.getKey());
+                values.add(entry.getValue());
+                allStat += 1;
+                if (keys.size() >= BATCH) {
+                    try {
+                        if(r.nextInt(10000) < 10){
+                            keys.stream().forEach(key->statKeys.add(key));
+                            statGetPerformance(secondDb,name,statKeys);
+                        }
+                        statKeys.clear();
+                        keys.clear();
+                        values.clear();
+                    } catch (Exception e) {
+                        spec.commandLine().getErr().println(String.format("Batch insert shuffled kv to %s error %s."
+                            , name, e.getStackTrace()));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            spec.commandLine().getErr().println(String.format("Expand %s error %s."
+                , name, e.getStackTrace()));
+        } finally {
+            try {
+                levelDb.close();
+                if(secondDb!=null) {
+                    secondDb.close();
+                }
+                JniDBFactory.popMemoryPool();
+            } catch (Exception e1) {
+                spec.commandLine().getErr().println(String.format("Close %s error %s."
+                    , name, e1.getStackTrace()));
+            }
+            spec.commandLine().getOut().println(String.format("Expand db %s done,expand count:%s", name, allStat));
+        }
+    }
+
+    private void doTestTopGet(DB levelDb, DB secondDb, String name, int rate) {
+        long allStat = 0;
+        List<byte[]> keys = new ArrayList<>(BATCH);
+        List<byte[]> values = new ArrayList<>(BATCH);
+
+        List<byte[]> statKeys = new ArrayList<>(BATCH);
+        try (DBIterator levelIterator = levelDb.iterator(
+            new org.iq80.leveldb.ReadOptions().fillCache(false))) {
+            JniDBFactory.pushMemoryPool(2048 * 2048);
+            levelIterator.seekToFirst();
+
+            while (levelIterator.hasNext() && allStat< BATCH) {
+                Map.Entry<byte[], byte[]> entry = levelIterator.next();
+                addShuffleKv(3,name,entry, rate, keys, values);
+                allStat += rate;
+                if (keys.size() >= BATCH) {
+                    try {
+                        keys.stream().forEach(key->statKeys.add(key));
+                        batchInsert(secondDb, keys, values);
+                    } catch (Exception e) {
+                        spec.commandLine().getErr().println(String.format("Batch insert shuffled kv to %s error %s."
+                            , name, e.getStackTrace()));
+                    }
+                }
+            }
+
+            if (!keys.isEmpty()) {
+                try {
+                    keys.stream().forEach(key->statKeys.add(key));
+                    batchInsert(secondDb, keys, values);
+                } catch (Exception e) {
+                    spec.commandLine().getErr().println(String.format("Batch insert shuffled kv to %s error %s."
+                        , name, e.getStackTrace()));
+                }
+            }
+            statGetPerformance(secondDb,name,statKeys);
+            mergeDb(secondDb,levelDb);
+            statGetPerformance(levelDb,name,statKeys);
+        } catch (Exception e) {
+            spec.commandLine().getErr().println(String.format("Expand %s error %s."
+                , name, e.getStackTrace()));
+        } finally {
+            try {
+                levelDb.close();
+                if(secondDb!=null) {
+                    secondDb.close();
+                }
+                JniDBFactory.popMemoryPool();
+            } catch (Exception e1) {
+                spec.commandLine().getErr().println(String.format("Close %s error %s."
+                    , name, e1.getStackTrace()));
+            }
+            spec.commandLine().getOut().println(String.format("Expand db %s done,expand count:%s", name, allStat));
+        }
+    }
+
+    private void statGetPerformance(DB secondDb,String name, List<byte[]> statKeys) {
+        if(statKeys==null||statKeys.isEmpty()){
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        for(byte[] key:statKeys){
+            long begin = System.nanoTime();
+            byte[] value = secondDb.get(key);
+            sb.append((System.nanoTime()-begin)/1000000.0+",");
+        }
+        spec.commandLine().getOut().println(name + " statGet :"+sb.toString());
+    }
+
+    private void mergeDbReverse(DB originDb, DB targetDb) {
+        List<byte[]> keys = new ArrayList<>(BATCH);
+        List<byte[]> values = new ArrayList<>(BATCH);
+        try (DBIterator levelIterator = originDb.iterator(
+            new org.iq80.leveldb.ReadOptions().fillCache(false))) {
+            JniDBFactory.pushMemoryPool(2048 * 2048);
+            levelIterator.seekToLast();
+
+            while (levelIterator.hasPrev()) {
+                Map.Entry<byte[], byte[]> entry = levelIterator.prev();
+                keys.add(entry.getKey());
+                values.add(entry.getValue());
+                if (keys.size() >= BATCH) {
+                    try {
+                        batchInsert(targetDb, keys, values);
+                    } catch (Exception e) {
+                        spec.commandLine().getErr().println(String.format("Batch insert kv error %s."
+                            , e.getMessage()));
+                    }
+                }
+            }
+
+            if (!keys.isEmpty()) {
+                try {
+                    batchInsert(targetDb, keys, values);
+                } catch (Exception e) {
+                    spec.commandLine().getErr().println(String.format("Batch insert kv error %s."
+                        , e.getMessage()));
+                }
+            }
+        } catch (Exception e) {
+            spec.commandLine().getErr().println(String.format("Merge error %s."
+                , e.getMessage()));
+        } finally {
+            spec.commandLine().getOut().println("Merge db done");
+        }
     }
 
     private void mergeDb(DB originDb, DB targetDb) {
