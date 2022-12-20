@@ -115,11 +115,23 @@ public class DbExpand implements Callable<Integer> {
             doExpandReverse(levelDb,secondDb,name,rate);
         }else if(op==5) {
             doTestGetInSecond(levelDb,levelDb,name);
-        } else {
+        }else if(op==6){
+            doExpandIter(levelDb,secondDb,name);
+        }else {
             doExpand(levelDb, secondDb, name, rate, op);
         }
         long cost = System.currentTimeMillis() - start;
         spec.commandLine().getOut().println(String.format("Expand db %s done,cost:%s seconds", name, cost / 1000.0));
+    }
+
+    private void doExpandIter(DB levelDb, DB secondDb, String name) {
+        try {
+            mergeDb(levelDb, secondDb);
+            levelDb.close();
+            secondDb.close();
+        }catch (Exception e){
+            spec.commandLine().getOut().println(String.format("Expand db %s error", name));
+        }
     }
 
     private void doExpandReverse(DB levelDb, DB secondDb, String name, int rate) {

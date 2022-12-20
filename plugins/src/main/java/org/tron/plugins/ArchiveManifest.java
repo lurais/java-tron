@@ -207,8 +207,8 @@ public class ArchiveManifest implements Callable<Boolean> {
 
       Map<Integer,Long> numMap = getLevelCount(database,secondDb,levels,level0,versions.getTableCache());
       StringBuilder sb2 = new StringBuilder();
-      numMap.entrySet().stream().forEach(entry->sb2.append("level:"+entry.getKey()+",count:"+entry.getValue()));
-      logger.info("travel sst final:"+sb.toString());
+      numMap.entrySet().stream().forEach(entry->sb2.append(",level:"+entry.getKey()+",count:"+entry.getValue()));
+      logger.info("travel sst final:"+sb2.toString());
     } catch (ClassNotFoundException e) {
       e.printStackTrace();
     } catch (NoSuchFieldException e) {
@@ -245,11 +245,18 @@ public class ArchiveManifest implements Callable<Boolean> {
 //      levelToNum.put(0,levelToNum.get(0)+keysFind);
     }
     for(Level level:levels){
+      int currentStat = 0;
       String preFix2 = name+" level"+level.getLevelNumber()+" get stat:";
       for(FileMetaData fileMetaData:level.getFiles()) {
         // 时间测量
+        if(level.getLevelNumber()<5 && currentStat>=5){
+          continue;
+        }
         List<byte[]> keys = doFetchKeys(fileMetaData, level, tableCache);
-        statTime(second, keys, Boolean.TRUE, Boolean.TRUE, preFix2);
+        if(currentStat<5) {
+          statTime(second, keys, Boolean.TRUE, Boolean.TRUE, preFix2);
+          currentStat++;
+        }
         if(level.getLevelNumber()>=5){
           long keysFind = statTime(db,keys,Boolean.FALSE,Boolean.FALSE,preFix2);
           levelToNum.put(level.getLevelNumber(),levelToNum.get(level.getLevelNumber())+keysFind);
@@ -300,39 +307,47 @@ public class ArchiveManifest implements Callable<Boolean> {
                                    TableCache tableCache)
       throws IllegalAccessException, NoSuchFieldException, ClassNotFoundException {
     List<byte[]> result = new ArrayList<>();
-    // open the iterator
-    InternalTableIterator iterator = tableCache.newIterator(fileMetaData);
-    iterator.seekToFirst();
+    try {
+      // open the iterator
+      InternalTableIterator iterator = tableCache.newIterator(fileMetaData);
+      iterator.seekToFirst();
 
-    while (iterator.hasNext()) {
-      // parse the key in the block
-      Map.Entry<InternalKey, Slice> entry = iterator.next();
-      InternalKey internalKey = entry.getKey();
-      if(internalKey==null){
-        continue;
+      while (iterator.hasNext()) {
+        // parse the key in the block
+        Map.Entry<InternalKey, Slice> entry = iterator.next();
+        InternalKey internalKey = entry.getKey();
+        if (internalKey == null) {
+          continue;
+        }
+        result.add(internalKey.getUserKey().getBytes());
       }
-      result.add(internalKey.getUserKey().getBytes());
+      return result;
+    }catch (Exception e){
+      return result;
     }
-    return result;
   }
 
   private List<byte[]> doFetchKeys(FileMetaData fileMetaData, Level level, TableCache tableCache)
       throws IllegalAccessException, NoSuchFieldException, ClassNotFoundException {
     List<byte[]> result = new ArrayList<>();
-    // open the iterator
-    InternalTableIterator iterator = tableCache.newIterator(fileMetaData);
-    iterator.seekToFirst();
+    try {
+      // open the iterator
+      InternalTableIterator iterator = tableCache.newIterator(fileMetaData);
+      iterator.seekToFirst();
 
-    while (iterator.hasNext()) {
-      // parse the key in the block
-      Map.Entry<InternalKey, Slice> entry = iterator.next();
-      InternalKey internalKey = entry.getKey();
-      if(internalKey==null){
-        continue;
+      while (iterator.hasNext()) {
+        // parse the key in the block
+        Map.Entry<InternalKey, Slice> entry = iterator.next();
+        InternalKey internalKey = entry.getKey();
+        if (internalKey == null) {
+          continue;
+        }
+        result.add(internalKey.getUserKey().getBytes());
       }
-      result.add(internalKey.getUserKey().getBytes());
+      return result;
+    }catch (Exception e){
+      return result;
     }
-    return result;
   }
 
   public boolean checkManifest(String dir) throws IOException {
