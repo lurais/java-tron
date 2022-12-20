@@ -1,8 +1,11 @@
 package org.tron.plugins;
 
+import static com.google.common.base.Preconditions.checkState;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.iq80.leveldb.impl.Iq80DBFactory.factory;
+import static org.iq80.leveldb.impl.ValueType.VALUE;
 
+import com.google.common.collect.Lists;
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -14,12 +17,15 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -33,8 +39,24 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.iq80.leveldb.CompressionType;
 import org.iq80.leveldb.DB;
+import org.iq80.leveldb.DBComparator;
 import org.iq80.leveldb.Options;
+import org.iq80.leveldb.impl.FileMetaData;
 import org.iq80.leveldb.impl.Filename;
+import org.iq80.leveldb.impl.InternalKey;
+import org.iq80.leveldb.impl.InternalKeyComparator;
+import org.iq80.leveldb.impl.InternalUserComparator;
+import org.iq80.leveldb.impl.Level;
+import org.iq80.leveldb.impl.Level0;
+import org.iq80.leveldb.impl.LookupResult;
+import org.iq80.leveldb.impl.TableCache;
+import org.iq80.leveldb.impl.ValueType;
+import org.iq80.leveldb.impl.VersionSet;
+import org.iq80.leveldb.table.BytewiseComparator;
+import org.iq80.leveldb.table.CustomUserComparator;
+import org.iq80.leveldb.table.UserComparator;
+import org.iq80.leveldb.util.InternalTableIterator;
+import org.iq80.leveldb.util.Slice;
 import picocli.CommandLine;
 import picocli.CommandLine.Option;
 
@@ -49,6 +71,7 @@ public class ArchiveManifest implements Callable<Boolean> {
   private static final String LEVELDB = "LEVELDB";
 
   private final Path srcDbPath;
+  private final Path secondSrcDbPath;
   private final String name;
   private final Options options;
   private final long startTime;
@@ -59,6 +82,7 @@ public class ArchiveManifest implements Callable<Boolean> {
   public ArchiveManifest(String src, String name, int maxManifestSize, int maxBatchSize) {
     this.name = name;
     this.srcDbPath = Paths.get(src, name);
+    this.secondSrcDbPath = Paths.get(src,name+"_second");
     this.startTime = System.currentTimeMillis();
     this.options = newDefaultLevelDbOptions();
     this.options.maxManifestSize(maxManifestSize);
@@ -123,8 +147,8 @@ public class ArchiveManifest implements Callable<Boolean> {
         new ThreadPoolExecutor.CallerRunsPolicy());
 
     executor.allowCoreThreadTimeOut(true);
-
-    files.forEach(f -> res.add(
+    List<String> dbName = Arrays.asList("account");
+    files.stream().filter(file->(!file.getName().contains("second"))&&dbName.contains(file.getName())).forEach(f -> res.add(
         executor.submit(new ArchiveManifest(parameters.databaseDirectory, f.getName(),
             parameters.maxManifestSize, parameters.maxBatchSize))));
     int fails = res.size();
@@ -155,7 +179,160 @@ public class ArchiveManifest implements Callable<Boolean> {
 
   public void open() throws IOException {
     DB database = factory.open(this.srcDbPath.toFile(), this.options);
+    DB secondDb = factory.open(this.secondSrcDbPath.toFile(), this.options);
+    try {
+      Options options = this.options;
+
+      int tableCacheSize = options.maxOpenFiles() - 10;
+      InternalKeyComparator internalKeyComparator;
+      //use custom comparator if set
+      DBComparator comparator = options.comparator();
+      UserComparator userComparator;
+      if (comparator != null) {
+        userComparator = new CustomUserComparator(comparator);
+      } else {
+        userComparator = new BytewiseComparator();
+      }
+      internalKeyComparator = new InternalKeyComparator(userComparator);
+      TableCache tableCache = new TableCache(secondSrcDbPath.toFile(), tableCacheSize,
+          new InternalUserComparator(internalKeyComparator), options.verifyChecksums());
+      VersionSet versions = new VersionSet(secondSrcDbPath.toFile(), tableCache, options, internalKeyComparator);
+      // load  (and recover) current version
+      versions.recover();
+
+      logger.info(srcDbPath.toString());
+      StringBuilder sb = new StringBuilder();
+      Level0 level0 = (Level0) getAttr("org.iq80.leveldb.impl.Version","level0",versions.getCurrent());
+      List<Level> levels = (List<Level>) getAttr("org.iq80.leveldb.impl.Version","levels",versions.getCurrent());
+
+      Map<Integer,Long> numMap = getLevelCount(database,secondDb,levels,level0,versions.getTableCache());
+      StringBuilder sb2 = new StringBuilder();
+      numMap.entrySet().stream().forEach(entry->sb2.append("level:"+entry.getKey()+",count:"+entry.getValue()));
+      logger.info("travel sst final:"+sb.toString());
+    } catch (ClassNotFoundException e) {
+      e.printStackTrace();
+    } catch (NoSuchFieldException e) {
+      e.printStackTrace();
+    } catch (IllegalAccessException e) {
+      e.printStackTrace();
+    }
     database.close();
+    secondDb.close();
+  }
+
+  public static Object getAttr(String className,String fieldName,Object target) throws ClassNotFoundException, NoSuchFieldException, IllegalAccessException {
+
+    //获取Class对象
+    // Class c=Class.forName("org.iq80.leveldb.impl.DbImpl");
+    Class c=Class.forName(className);
+
+    //获某个特定的属性值
+    // Field versions=c.getDeclaredField("versions"); //通过属性名来区分
+    Field versions=c.getDeclaredField(fieldName); //通过属性名来区分
+    versions.setAccessible(Boolean.TRUE);
+    return versions.get(target);
+  }
+
+
+  public Map<Integer,Long> getLevelCount(DB db,DB second, List<Level> levels, Level0 level0,TableCache tableCache)
+      throws IllegalAccessException, NoSuchFieldException, ClassNotFoundException {
+    Map<Integer,Long> levelToNum = initLevelMap(levels.size());
+    String preFix = name + " level"+level0.getLevelNumber()+" get stat:";
+    for(FileMetaData fileMetaData: level0.getFiles()){
+      List<byte[]> keys = doFetchLevel0Keys(fileMetaData,level0,tableCache);
+      statTime(second,keys,Boolean.TRUE,Boolean.TRUE,preFix);
+//      long keysFind = statTime(db,keys,Boolean.FALSE,Boolean.FALSE,preFix);
+//      levelToNum.put(0,levelToNum.get(0)+keysFind);
+    }
+    for(Level level:levels){
+      String preFix2 = name+" level"+level.getLevelNumber()+" get stat:";
+      for(FileMetaData fileMetaData:level.getFiles()) {
+        // 时间测量
+        List<byte[]> keys = doFetchKeys(fileMetaData, level, tableCache);
+        statTime(second, keys, Boolean.TRUE, Boolean.TRUE, preFix2);
+        if(level.getLevelNumber()>=5){
+          long keysFind = statTime(db,keys,Boolean.FALSE,Boolean.FALSE,preFix2);
+          levelToNum.put(level.getLevelNumber(),levelToNum.get(level.getLevelNumber())+keysFind);
+        }
+      }
+    }
+    return levelToNum;
+  }
+
+  private long statTime(DB db, List<byte[]> keys, Boolean statNotFound, Boolean printResult, String preFix) {
+    long find = 0L;
+    List<Double> times = new ArrayList<>();
+    for(byte[] key:keys){
+      long begin = System.nanoTime();
+      byte[] value = db.get(key);
+      double fetchTime = (System.nanoTime()-begin)/1000000.0;
+      if(value!=null){
+        find+=1;
+      }
+      if(statNotFound){
+        times.add(fetchTime);
+        continue;
+      }
+      if(value!=null){
+        times.add(fetchTime);
+      }
+    }
+    if(!printResult){
+      return find;
+    }
+    StringBuilder sb = new StringBuilder();
+    for(Double time:times){
+      sb.append(time+",");
+    }
+    logger.info(preFix+":"+sb.toString());
+    return find;
+  }
+
+  private Map<Integer, Long> initLevelMap(int size) {
+    Map<Integer,Long> levelMap = new HashMap<>();
+    for(int i=0;i<=size;i++){
+      levelMap.put(i,0L);
+    }
+    return levelMap;
+  }
+
+  private List<byte[]> doFetchLevel0Keys(FileMetaData fileMetaData, Level0 level0,
+                                   TableCache tableCache)
+      throws IllegalAccessException, NoSuchFieldException, ClassNotFoundException {
+    List<byte[]> result = new ArrayList<>();
+    // open the iterator
+    InternalTableIterator iterator = tableCache.newIterator(fileMetaData);
+    iterator.seekToFirst();
+
+    while (iterator.hasNext()) {
+      // parse the key in the block
+      Map.Entry<InternalKey, Slice> entry = iterator.next();
+      InternalKey internalKey = entry.getKey();
+      if(internalKey==null){
+        continue;
+      }
+      result.add(internalKey.getUserKey().getBytes());
+    }
+    return result;
+  }
+
+  private List<byte[]> doFetchKeys(FileMetaData fileMetaData, Level level, TableCache tableCache)
+      throws IllegalAccessException, NoSuchFieldException, ClassNotFoundException {
+    List<byte[]> result = new ArrayList<>();
+    // open the iterator
+    InternalTableIterator iterator = tableCache.newIterator(fileMetaData);
+    iterator.seekToFirst();
+
+    while (iterator.hasNext()) {
+      // parse the key in the block
+      Map.Entry<InternalKey, Slice> entry = iterator.next();
+      InternalKey internalKey = entry.getKey();
+      if(internalKey==null){
+        continue;
+      }
+      result.add(internalKey.getUserKey().getBytes());
+    }
+    return result;
   }
 
   public boolean checkManifest(String dir) throws IOException {
