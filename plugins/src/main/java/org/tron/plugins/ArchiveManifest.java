@@ -3,9 +3,7 @@ package org.tron.plugins;
 import static com.google.common.base.Preconditions.checkState;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.iq80.leveldb.impl.Iq80DBFactory.factory;
-import static org.iq80.leveldb.impl.ValueType.VALUE;
 
-import com.google.common.collect.Lists;
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -48,9 +46,7 @@ import org.iq80.leveldb.impl.InternalKeyComparator;
 import org.iq80.leveldb.impl.InternalUserComparator;
 import org.iq80.leveldb.impl.Level;
 import org.iq80.leveldb.impl.Level0;
-import org.iq80.leveldb.impl.LookupResult;
 import org.iq80.leveldb.impl.TableCache;
-import org.iq80.leveldb.impl.ValueType;
 import org.iq80.leveldb.impl.VersionSet;
 import org.iq80.leveldb.table.BytewiseComparator;
 import org.iq80.leveldb.table.CustomUserComparator;
@@ -72,6 +68,7 @@ public class ArchiveManifest implements Callable<Boolean> {
 
   private final Path srcDbPath;
   private final Path secondSrcDbPath;
+  private final Path thirdSrcDbPath;
   private final String name;
   private final Options options;
   private final long startTime;
@@ -83,6 +80,7 @@ public class ArchiveManifest implements Callable<Boolean> {
     this.name = name;
     this.srcDbPath = Paths.get(src, name);
     this.secondSrcDbPath = Paths.get(src,name+"_second");
+    this.thirdSrcDbPath = Paths.get(src,name+"_third");
     this.startTime = System.currentTimeMillis();
     this.options = newDefaultLevelDbOptions();
     this.options.maxManifestSize(maxManifestSize);
@@ -148,7 +146,7 @@ public class ArchiveManifest implements Callable<Boolean> {
 
     executor.allowCoreThreadTimeOut(true);
     List<String> dbName = Arrays.asList("account");
-    files.stream().filter(file->(!file.getName().contains("second"))&&dbName.contains(file.getName())).forEach(f -> res.add(
+    files.stream().filter(file->(!file.getName().contains("second"))&&(!file.getName().contains("third"))&&dbName.contains(file.getName())).forEach(f -> res.add(
         executor.submit(new ArchiveManifest(parameters.databaseDirectory, f.getName(),
             parameters.maxManifestSize, parameters.maxBatchSize))));
     int fails = res.size();
@@ -180,6 +178,7 @@ public class ArchiveManifest implements Callable<Boolean> {
   public void open() throws IOException {
     DB database = factory.open(this.srcDbPath.toFile(), this.options);
     DB secondDb = factory.open(this.secondSrcDbPath.toFile(), this.options);
+    DB thirdDb = factory.open(this.thirdSrcDbPath.toFile(), this.options);
     try {
       Options options = this.options;
 
@@ -205,7 +204,7 @@ public class ArchiveManifest implements Callable<Boolean> {
       Level0 level0 = (Level0) getAttr("org.iq80.leveldb.impl.Version","level0",versions.getCurrent());
       List<Level> levels = (List<Level>) getAttr("org.iq80.leveldb.impl.Version","levels",versions.getCurrent());
 
-      Map<Integer,Long> numMap = getLevelCount(database,secondDb,levels,level0,versions.getTableCache());
+      Map<Integer,Long> numMap = getLevelCount(database, thirdDb,levels,level0,versions.getTableCache());
       StringBuilder sb2 = new StringBuilder();
       numMap.entrySet().stream().forEach(entry->sb2.append(",level:"+entry.getKey()+",count:"+entry.getValue()));
       logger.info("travel sst final:"+sb2.toString());
@@ -234,15 +233,18 @@ public class ArchiveManifest implements Callable<Boolean> {
   }
 
 
-  public Map<Integer,Long> getLevelCount(DB db,DB second, List<Level> levels, Level0 level0,TableCache tableCache)
+  public Map<Integer,Long> getLevelCount(DB db, DB third, List<Level> levels, Level0 level0, TableCache tableCache)
       throws IllegalAccessException, NoSuchFieldException, ClassNotFoundException {
     Map<Integer,Long> levelToNum = initLevelMap(levels.size());
     String preFix = name + " level"+level0.getLevelNumber()+" get stat:";
+    int currentStat0 = 0;
     for(FileMetaData fileMetaData: level0.getFiles()){
+      if(currentStat0 > 5){
+        continue;
+      }
       List<byte[]> keys = doFetchLevel0Keys(fileMetaData,level0,tableCache);
-      statTime(second,keys,Boolean.TRUE,Boolean.TRUE,preFix);
-//      long keysFind = statTime(db,keys,Boolean.FALSE,Boolean.FALSE,preFix);
-//      levelToNum.put(0,levelToNum.get(0)+keysFind);
+      statTime(third,keys,Boolean.TRUE,Boolean.TRUE,preFix);
+      currentStat0++;
     }
     for(Level level:levels){
       int currentStat = 0;
@@ -254,7 +256,7 @@ public class ArchiveManifest implements Callable<Boolean> {
         }
         List<byte[]> keys = doFetchKeys(fileMetaData, level, tableCache);
         if(currentStat<5) {
-          statTime(second, keys, Boolean.TRUE, Boolean.TRUE, preFix2);
+          statTime(third, keys, Boolean.TRUE, Boolean.TRUE, preFix2);
           currentStat++;
         }
         if(level.getLevelNumber()>=5){
