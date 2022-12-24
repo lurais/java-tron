@@ -1076,6 +1076,10 @@ public class Manager {
   public static AtomicLong consume,consumedb ,traceExec,traceExecdb,traceFinal,traceFinaldb,sign,signdb=new AtomicLong(0);
   public static AtomicLong notPushconsume,notPushconsumedb ,notPushtraceExec,notPushtraceExecdb,notPushtraceFinal,notPushtraceFinaldb,notPushsign,notPushsigndb=new AtomicLong(0);
 
+  static {
+    resetDBMetric();
+  }
+
   public static void resetDBMetric(){
     consume = new AtomicLong(0);
     consumedb = new AtomicLong(0);
