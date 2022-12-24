@@ -16,10 +16,7 @@ import org.tron.core.db.accountstate.AccountStateCallBackUtils;
 import org.tron.protos.contract.BalanceContract.TransactionBalanceTrace;
 import org.tron.protos.contract.BalanceContract.TransactionBalanceTrace.Operation;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.OptionalLong;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j(topic="DB")
@@ -41,6 +38,8 @@ public class AccountStore extends TronStoreWithRevoking<AccountCapsule> {
   private DynamicPropertiesStore dynamicPropertiesStore;
 
   public static AtomicLong timer = new AtomicLong(0);
+
+  public static LinkedList<Long> times = new LinkedList<>();
 
   @Autowired
   private AccountStore(@Value("account") String dbName) {
@@ -67,6 +66,7 @@ public class AccountStore extends TronStoreWithRevoking<AccountCapsule> {
       long time = System.nanoTime()-start;
       if(time > 0) {
         timer.addAndGet(time);
+        times.add(time);
       }
     }
   }

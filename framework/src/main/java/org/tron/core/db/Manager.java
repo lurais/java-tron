@@ -126,6 +126,7 @@ import org.tron.core.service.MortgageService;
 import org.tron.core.store.*;
 import org.tron.core.utils.TransactionRegister;
 import org.tron.core.vm.config.VMConfig;
+import org.tron.core.vm.program.Storage;
 import org.tron.protos.Protocol;
 import org.tron.protos.Protocol.AccountType;
 import org.tron.protos.Protocol.Permission;
@@ -1325,6 +1326,7 @@ public class Manager {
     if (trxCap == null) {
       return null;
     }
+    resetDbTimes();
     long t1 = System.nanoTime();
     Contract contract = trxCap.getInstance().getRawData().getContract(0);
     Sha256Hash txId = trxCap.getTransactionId();
@@ -1462,8 +1464,28 @@ public class Manager {
       logger.info("Process transaction {} cost {} ms during {}, {}",
               Hex.toHexString(transactionInfo.getId()), cost, type, contract.getType().name());
     }
+    printLogTimes(isPush);
     Metrics.histogramObserve(requestTimer);
     return transactionInfo.getInstance();
+  }
+
+  private void printLogTimes(Boolean isPush) {
+    StringBuilder sb = new StringBuilder();
+    StringBuilder finalSb = sb;
+    AccountStore.times.stream().forEach(item-> finalSb.append(item+","));
+    logger.info("account process trans "+isPush+" "+sb.toString());
+    sb = new StringBuilder();
+    StringBuilder finalSb1 = sb;
+    CodeStore.times.stream().forEach(item-> finalSb1.append(item+","));
+    logger.info("code process trans "+isPush+" "+sb.toString());
+    sb = new StringBuilder();
+    StringBuilder finalSb2 = sb;
+    ContractStore.times.stream().forEach(item-> finalSb2.append(item+","));
+    logger.info("contract process trans "+isPush+" "+sb.toString());
+    sb = new StringBuilder();
+    StringBuilder finalSb3 = sb;
+    StorageRowStore.times.stream().forEach(item-> finalSb3.append(item+","));
+    logger.info("storage-row process trans "+isPush+" "+sb.toString());
   }
 
   /**
@@ -1657,6 +1679,13 @@ public class Manager {
     StorageRowStore.timer = new AtomicLong(0);
     CodeStore.timer = new AtomicLong(0);
     ContractStore.timer = new AtomicLong(0);
+  }
+
+  public void resetDbTimes(){
+    AccountStore.times = new LinkedList<>();
+    StorageRowStore.times = new LinkedList<>();
+    CodeStore.times = new LinkedList<>();
+    ContractStore.times = new LinkedList<>();
   }
 
   public long getDBTimer(){

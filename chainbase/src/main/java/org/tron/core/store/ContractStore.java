@@ -11,6 +11,7 @@ import org.tron.core.capsule.ContractCapsule;
 import org.tron.core.db.TronStoreWithRevoking;
 import org.tron.protos.contract.SmartContractOuterClass.SmartContract;
 
+import java.util.LinkedList;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -24,6 +25,7 @@ public class ContractStore extends TronStoreWithRevoking<ContractCapsule> {
   }
 
   public static AtomicLong timer = new AtomicLong(0);
+  public static LinkedList<Long> times = new LinkedList<>();
 
 
   @Override
@@ -35,6 +37,7 @@ public class ContractStore extends TronStoreWithRevoking<ContractCapsule> {
       long time = System.nanoTime()-start;
       if(time > 0) {
           timer.addAndGet(time);
+          times.add(time);
       }
     }
   }

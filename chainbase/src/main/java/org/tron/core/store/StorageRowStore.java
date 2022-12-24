@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.tron.core.capsule.StorageRowCapsule;
 import org.tron.core.db.TronStoreWithRevoking;
 
+import java.util.LinkedList;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j(topic = "DB")
@@ -19,6 +20,8 @@ public class StorageRowStore extends TronStoreWithRevoking<StorageRowCapsule> {
   }
 
   public static AtomicLong timer = new AtomicLong(0);
+  public static LinkedList<Long> times = new LinkedList<>();
+
 
 
   @Override
@@ -32,6 +35,7 @@ public class StorageRowStore extends TronStoreWithRevoking<StorageRowCapsule> {
       long time = System.nanoTime() - start;
       if (time > 0) {
         timer.addAndGet(time);
+        times.add(time);
       }
     }
   }
