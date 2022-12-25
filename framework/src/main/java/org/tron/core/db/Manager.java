@@ -1475,6 +1475,10 @@ public class Manager {
     AccountStore.times.stream().forEach(item-> finalSb.append(item+","));
     logger.info("account process trans "+isPush+" "+sb.toString());
     sb = new StringBuilder();
+    StringBuilder finalSb4 = sb;
+    AccountStore.notFoundtimes.stream().forEach(item-> finalSb4.append(item+","));
+    logger.info("account notFound process trans "+isPush+" "+sb.toString());
+    sb = new StringBuilder();
     StringBuilder finalSb1 = sb;
     CodeStore.times.stream().forEach(item-> finalSb1.append(item+","));
     logger.info("code process trans "+isPush+" "+sb.toString());
@@ -1683,6 +1687,7 @@ public class Manager {
 
   public void resetDbTimes(){
     AccountStore.times = new LinkedList<>();
+    AccountStore.notFoundtimes = new LinkedList<>();
     StorageRowStore.times = new LinkedList<>();
     CodeStore.times = new LinkedList<>();
     ContractStore.times = new LinkedList<>();

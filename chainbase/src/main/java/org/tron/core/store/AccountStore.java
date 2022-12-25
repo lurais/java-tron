@@ -41,6 +41,9 @@ public class AccountStore extends TronStoreWithRevoking<AccountCapsule> {
 
   public static LinkedList<Long> times = new LinkedList<>();
 
+  public static LinkedList<Long> notFoundtimes = new LinkedList<>();
+
+
   @Autowired
   private AccountStore(@Value("account") String dbName) {
     super(dbName);
@@ -59,14 +62,18 @@ public class AccountStore extends TronStoreWithRevoking<AccountCapsule> {
   @Override
   public AccountCapsule get(byte[] key) {
     long start = System.nanoTime();
+    byte[] value = null;
     try {
-      byte[] value = revokingDB.getUnchecked(key);
+      value = revokingDB.getUnchecked(key);
       return ArrayUtils.isEmpty(value) ? null : new AccountCapsule(value);
     }finally {
       long time = System.nanoTime()-start;
       if(time > 0) {
         timer.addAndGet(time);
         times.add(time);
+        if(value==null){
+          notFoundtimes.add(time);
+        }
       }
     }
   }
