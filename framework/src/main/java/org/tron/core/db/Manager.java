@@ -1464,9 +1464,27 @@ public class Manager {
       logger.info("Process transaction {} cost {} ms during {}, {}",
               Hex.toHexString(transactionInfo.getId()), cost, type, contract.getType().name());
     }
+    printTransactionTime(System.nanoTime()-t1,isPush);
     printLogTimes(isPush);
     Metrics.histogramObserve(requestTimer);
     return transactionInfo.getInstance();
+  }
+
+  private void printTransactionTime(long time, boolean isPush) {
+    long allDbTime = 0L;
+    for(long current:AccountStore.times){
+      allDbTime =allDbTime+current;
+    }
+    for(long current:CodeStore.times){
+      allDbTime =allDbTime+current;
+    }
+    for(long current:ContractStore.times){
+      allDbTime =allDbTime+current;
+    }
+    for(long current:StorageRowStore.times){
+      allDbTime =allDbTime+current;
+    }
+    logger.info("process trans "+isPush+" finish,allDbTime:"+allDbTime+",processAllTime="+time);
   }
 
   private void printLogTimes(Boolean isPush) {
