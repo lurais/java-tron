@@ -843,13 +843,13 @@ public class Manager {
      BandwidthProcessor processor = new BandwidthProcessor(chainBaseManager);
      processor.consume(trx, trace);
    }finally {
-        if(isPush){
-          Manager.consume.addAndGet(System.nanoTime()-start);
-          Manager.consumedb.addAndGet(getDBTimer());
-        }else{
-          Manager.notPushconsume.addAndGet(System.nanoTime()-start);
-          Manager.notPushconsumedb.addAndGet(getDBTimer());
-        }
+//        if(isPush){
+//          Manager.consume.addAndGet(System.nanoTime()-start);
+//          Manager.consumedb.addAndGet(getDBTimer());
+//        }else{
+//          Manager.notPushconsume.addAndGet(System.nanoTime()-start);
+//          Manager.notPushconsumedb.addAndGet(getDBTimer());
+//        }
    }
   }
 
@@ -1377,13 +1377,13 @@ public class Manager {
     resetDBTimer();
     long start1 = System.nanoTime();
     trace.exec();
-    if(isPush){
-      Manager.traceExec.addAndGet(System.nanoTime()-start1);
-      Manager.traceExecdb.addAndGet(getDBTimer());
-    }else{
-      Manager.notPushtraceExec.addAndGet(System.nanoTime()-start1);
-      Manager.notPushtraceExecdb.addAndGet(getDBTimer());
-    }
+//    if(isPush){
+//      Manager.traceExec.addAndGet(System.nanoTime()-start1);
+//      Manager.traceExecdb.addAndGet(getDBTimer());
+//    }else{
+//      Manager.notPushtraceExec.addAndGet(System.nanoTime()-start1);
+//      Manager.notPushtraceExecdb.addAndGet(getDBTimer());
+//    }
 
     if (Objects.nonNull(blockCap)) {
       trace.setResult();
@@ -1393,13 +1393,13 @@ public class Manager {
         resetDBTimer();
         long start2 = System.nanoTime();
         trace.exec();
-        if(isPush){
-          Manager.traceExec.addAndGet(System.nanoTime()-start2);
-          Manager.traceExecdb.addAndGet(getDBTimer());
-        }else{
-          Manager.notPushtraceExec.addAndGet(System.nanoTime()-start2);
-          Manager.notPushtraceExecdb.addAndGet(getDBTimer());
-        }
+//        if(isPush){
+//          Manager.traceExec.addAndGet(System.nanoTime()-start2);
+//          Manager.traceExecdb.addAndGet(getDBTimer());
+//        }else{
+//          Manager.notPushtraceExec.addAndGet(System.nanoTime()-start2);
+//          Manager.notPushtraceExecdb.addAndGet(getDBTimer());
+//        }
         trace.setResult();
         logger.info("Retry result when push: {}, for tx id: {}, tx resultCode in receipt: {}.",
                 blockCap.hasWitnessSignature(), txId, trace.getReceipt().getResult());
@@ -1412,13 +1412,13 @@ public class Manager {
     long start3 = System.nanoTime();
     resetDBTimer();
     trace.finalization();
-    if(isPush){
-     Manager.traceFinal.addAndGet(System.nanoTime()-start3);
-     Manager.traceFinaldb.addAndGet(getDBTimer());
-    }else{
-      Manager.notPushtraceFinal.addAndGet(System.nanoTime()-start3);
-      Manager.notPushtraceFinaldb.addAndGet(getDBTimer());
-    }
+//    if(isPush){
+//     Manager.traceFinal.addAndGet(System.nanoTime()-start3);
+//     Manager.traceFinaldb.addAndGet(getDBTimer());
+//    }else{
+//      Manager.notPushtraceFinal.addAndGet(System.nanoTime()-start3);
+//      Manager.notPushtraceFinaldb.addAndGet(getDBTimer());
+//    }
 
     if (getDynamicPropertiesStore().supportVM()) {
       trxCap.setResult(trace.getTransactionContext());
@@ -1472,42 +1472,44 @@ public class Manager {
 
   private void printTransactionTime(long time, boolean isPush) {
     long allDbTime = 0L;
-    for(long current:AccountStore.times){
-      allDbTime =allDbTime+current;
+//    for(long current:AccountStore.times){
+//      allDbTime =allDbTime+current;
+//    }
+//    for(long current:CodeStore.times){
+//      allDbTime =allDbTime+current;
+//    }
+//    for(long current:ContractStore.times){
+//      allDbTime =allDbTime+current;
+//    }
+//    for(long current:StorageRowStore.times){
+//      allDbTime =allDbTime+current;
+//    }
+    if(!isPush) {
+      logger.info("process trans " + isPush + " finish,allDbTime:" + allDbTime + ",processAllTime=" + time/1000000.0);
     }
-    for(long current:CodeStore.times){
-      allDbTime =allDbTime+current;
-    }
-    for(long current:ContractStore.times){
-      allDbTime =allDbTime+current;
-    }
-    for(long current:StorageRowStore.times){
-      allDbTime =allDbTime+current;
-    }
-    logger.info("process trans "+isPush+" finish,allDbTime:"+allDbTime+",processAllTime="+time);
   }
 
   private void printLogTimes(Boolean isPush) {
-    StringBuilder sb = new StringBuilder();
-    StringBuilder finalSb = sb;
-    AccountStore.times.stream().forEach(item-> finalSb.append(item+","));
-    logger.info("account process trans "+isPush+" "+sb.toString());
-    sb = new StringBuilder();
-    StringBuilder finalSb4 = sb;
-    AccountStore.notFoundtimes.stream().forEach(item-> finalSb4.append(item+","));
-    logger.info("account notFound process trans "+isPush+" "+sb.toString());
-    sb = new StringBuilder();
-    StringBuilder finalSb1 = sb;
-    CodeStore.times.stream().forEach(item-> finalSb1.append(item+","));
-    logger.info("code process trans "+isPush+" "+sb.toString());
-    sb = new StringBuilder();
-    StringBuilder finalSb2 = sb;
-    ContractStore.times.stream().forEach(item-> finalSb2.append(item+","));
-    logger.info("contract process trans "+isPush+" "+sb.toString());
-    sb = new StringBuilder();
-    StringBuilder finalSb3 = sb;
-    StorageRowStore.times.stream().forEach(item-> finalSb3.append(item+","));
-    logger.info("storage-row process trans "+isPush+" "+sb.toString());
+//    StringBuilder sb = new StringBuilder();
+//    StringBuilder finalSb = sb;
+//    AccountStore.times.stream().forEach(item-> finalSb.append(item+","));
+//    logger.info("account process trans "+isPush+" "+sb.toString());
+//    sb = new StringBuilder();
+//    StringBuilder finalSb4 = sb;
+//    AccountStore.notFoundtimes.stream().forEach(item-> finalSb4.append(item+","));
+//    logger.info("account notFound process trans "+isPush+" "+sb.toString());
+//    sb = new StringBuilder();
+//    StringBuilder finalSb1 = sb;
+//    CodeStore.times.stream().forEach(item-> finalSb1.append(item+","));
+//    logger.info("code process trans "+isPush+" "+sb.toString());
+//    sb = new StringBuilder();
+//    StringBuilder finalSb2 = sb;
+//    ContractStore.times.stream().forEach(item-> finalSb2.append(item+","));
+//    logger.info("contract process trans "+isPush+" "+sb.toString());
+//    sb = new StringBuilder();
+//    StringBuilder finalSb3 = sb;
+//    StorageRowStore.times.stream().forEach(item-> finalSb3.append(item+","));
+//    logger.info("storage-row process trans "+isPush+" "+sb.toString());
   }
 
   /**
@@ -1521,6 +1523,7 @@ public class Manager {
             (System.currentTimeMillis() - blockTime) / Metrics.MILLISECONDS_PER_SECOND, address);
     long postponedTrxCount = 0;
     logger.info("Generate block {} begin.", chainBaseManager.getHeadBlockNum() + 1);
+    logger.info("Gen block pendingCount:{},rePushCount:{},postponedCount:{}", pendingTransactions.size(), rePushTransactions.size(), postponedTrxCount);
 
     long total_1 = 0, total_2 = 0, total_3 = 0, total_4 = 0, total_5 = 0, total_6 = 0, total_7 = 0, total_8 = 0;
     long t1 = System.nanoTime();
@@ -1697,18 +1700,18 @@ public class Manager {
   }
 
   public void resetDBTimer(){
-    AccountStore.timer = new AtomicLong(0);
-    StorageRowStore.timer = new AtomicLong(0);
-    CodeStore.timer = new AtomicLong(0);
-    ContractStore.timer = new AtomicLong(0);
+//    AccountStore.timer = new AtomicLong(0);
+//    StorageRowStore.timer = new AtomicLong(0);
+//    CodeStore.timer = new AtomicLong(0);
+//    ContractStore.timer = new AtomicLong(0);
   }
 
   public void resetDbTimes(){
-    AccountStore.times = new LinkedList<>();
-    AccountStore.notFoundtimes = new LinkedList<>();
-    StorageRowStore.times = new LinkedList<>();
-    CodeStore.times = new LinkedList<>();
-    ContractStore.times = new LinkedList<>();
+//    AccountStore.times = new LinkedList<>();
+//    AccountStore.notFoundtimes = new LinkedList<>();
+//    StorageRowStore.times = new LinkedList<>();
+//    CodeStore.times = new LinkedList<>();
+//    ContractStore.times = new LinkedList<>();
   }
 
   public long getDBTimer(){
@@ -1748,13 +1751,13 @@ public class Manager {
         logger.error("Parallel check sign interrupted exception! block info: {}.", block, e);
         Thread.currentThread().interrupt();
       }finally {
-        if(isPush){
-          Manager.sign.addAndGet(System.nanoTime()-tv);
-          Manager.signdb.addAndGet(getDBTimer());
-        }else{
-          Manager.notPushsign.addAndGet(System.nanoTime()-tv);
-          Manager.notPushsigndb.addAndGet(getDBTimer());
-        }
+//        if(isPush){
+//          Manager.sign.addAndGet(System.nanoTime()-tv);
+//          Manager.signdb.addAndGet(getDBTimer());
+//        }else{
+//          Manager.notPushsign.addAndGet(System.nanoTime()-tv);
+//          Manager.notPushsigndb.addAndGet(getDBTimer());
+//        }
       }
     }
 

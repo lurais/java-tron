@@ -61,20 +61,20 @@ public class AccountStore extends TronStoreWithRevoking<AccountCapsule> {
 
   @Override
   public AccountCapsule get(byte[] key) {
-    long start = System.nanoTime();
+//    long start = System.nanoTime();
     byte[] value = null;
     try {
       value = revokingDB.getUnchecked(key);
       return ArrayUtils.isEmpty(value) ? null : new AccountCapsule(value);
     }finally {
-      long time = System.nanoTime()-start;
-      if(time > 0) {
-        timer.addAndGet(time);
-        times.add(time);
-        if(value==null){
-          notFoundtimes.add(time);
-        }
-      }
+//      long time = System.nanoTime()-start;
+//      if(time > 0) {
+//        timer.addAndGet(time);
+//        times.add(time);
+//        if(value==null){
+//          notFoundtimes.add(time);
+//        }
+//      }
     }
   }
 

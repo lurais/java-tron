@@ -26,17 +26,17 @@ public class StorageRowStore extends TronStoreWithRevoking<StorageRowCapsule> {
 
   @Override
   public StorageRowCapsule get(byte[] key) {
-    long start = System.nanoTime();
+//    long start = System.nanoTime();
     try {
       StorageRowCapsule row = getUnchecked(key);
       row.setRowKey(key);
       return row;
     }finally {
-      long time = System.nanoTime() - start;
-      if (time > 0) {
-        timer.addAndGet(time);
-        times.add(time);
-      }
+//      long time = System.nanoTime() - start;
+//      if (time > 0) {
+//        timer.addAndGet(time);
+//        times.add(time);
+//      }
     }
   }
 }
