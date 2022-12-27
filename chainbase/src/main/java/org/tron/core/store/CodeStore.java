@@ -26,15 +26,15 @@ public class CodeStore extends TronStoreWithRevoking<CodeCapsule> {
 
   @Override
   public CodeCapsule get(byte[] key) {
-//    long start = System.nanoTime();
+    long start = System.nanoTime();
     try{
       return getUnchecked(key);
     }finally {
-//      long time = System.nanoTime()-start;
-//      if(time > 0) {
-//        timer.addAndGet(time);
-//        times.add(time);
-//      }
+      long time = System.nanoTime()-start;
+      if(time > 0) {
+        timer.addAndGet(time);
+        times.add(time);
+      }
     }
   }
 
