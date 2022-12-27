@@ -810,7 +810,7 @@ public class Manager {
             processTransaction(trx, null,false);
             trx.setTrxTrace(null);
             pendingTransactions.add(trx);
-            logger.info("pending trans add :"+pendingTransactions.size()+",repushSize="+rePushTransactions.size());
+            //logger.info("pending trans add :"+pendingTransactions.size()+",repushSize="+rePushTransactions.size());
             Metrics.gaugeInc(MetricKeys.Gauge.MANAGER_QUEUE, 1,
                     MetricLabels.Gauge.QUEUE_PENDING);
             tmpSession.merge();
