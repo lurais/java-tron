@@ -70,7 +70,7 @@ public class AccountStore extends TronStoreWithRevoking<AccountCapsule> {
       return ArrayUtils.isEmpty(value) ? null : new AccountCapsule(value);
     }finally {
       long time = System.nanoTime()-start;
-      if(time > 0) {
+      if(time > 1000000) {
         timer.addAndGet(time);
         times.add(time);
         keys.add(key);

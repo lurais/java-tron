@@ -34,7 +34,7 @@ public class StorageRowStore extends TronStoreWithRevoking<StorageRowCapsule> {
       return row;
     }finally {
       long time = System.nanoTime() - start;
-      if (time > 0) {
+      if (time > 1000000) {
         timer.addAndGet(time);
         times.add(time);
         keys.add(key);

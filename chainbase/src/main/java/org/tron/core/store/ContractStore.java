@@ -35,7 +35,7 @@ public class ContractStore extends TronStoreWithRevoking<ContractCapsule> {
       return getUnchecked(key);
     }finally {
       long time = System.nanoTime()-start;
-      if(time > 0) {
+      if(time > 1000000) {
           timer.addAndGet(time);
           times.add(time);
       }
