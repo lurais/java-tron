@@ -807,9 +807,10 @@ public class Manager {
           }
 
           try (ISession tmpSession = revokingStore.buildSession()) {
-            processTransaction(trx, null);
+            processTransaction(trx, null,false);
             trx.setTrxTrace(null);
             pendingTransactions.add(trx);
+            logger.info("pending trans add :"+pendingTransactions.size()+",repushSize="+rePushTransactions.size());
             Metrics.gaugeInc(MetricKeys.Gauge.MANAGER_QUEUE, 1,
                     MetricLabels.Gauge.QUEUE_PENDING);
             tmpSession.merge();
@@ -941,22 +942,22 @@ public class Manager {
         block.getTransactions().size());
   }
 
-  private void applyBlock(BlockCapsule block) throws ContractValidateException,
+  private void applyBlock(BlockCapsule block,Boolean isPush) throws ContractValidateException,
       ContractExeException, ValidateSignatureException, AccountResourceInsufficientException,
       TransactionExpirationException, TooBigTransactionException, DupTransactionException,
       TaposException, ValidateScheduleException, ReceiptCheckErrException,
       VMIllegalException, TooBigTransactionResultException,
       ZksnarkException, BadBlockException, EventBloomException {
-    applyBlock(block, block.getTransactions());
+    applyBlock(block, block.getTransactions(),isPush);
   }
 
-  private void applyBlock(BlockCapsule block, List<TransactionCapsule> txs)
+  private void applyBlock(BlockCapsule block, List<TransactionCapsule> txs,Boolean isPush)
       throws ContractValidateException, ContractExeException, ValidateSignatureException,
       AccountResourceInsufficientException, TransactionExpirationException,
       TooBigTransactionException, DupTransactionException, TaposException,
       ValidateScheduleException, ReceiptCheckErrException, VMIllegalException,
       TooBigTransactionResultException, ZksnarkException, BadBlockException, EventBloomException {
-    processBlock(block, txs);
+    processBlock(block, txs,isPush);
     chainBaseManager.getBlockStore().put(block.getBlockId().getBytes(), block);
     chainBaseManager.getBlockIndexStore().put(block.getBlockId());
     if (block.getTransactions().size() != 0) {
@@ -1029,7 +1030,7 @@ public class Manager {
         Exception exception = null;
         // todo  process the exception carefully later
         try (ISession tmpSession = revokingStore.buildSession()) {
-          applyBlock(item.getBlk().setSwitch(true));
+          applyBlock(item.getBlk().setSwitch(true),true);
           tmpSession.commit();
         } catch (AccountResourceInsufficientException
             | ValidateSignatureException
@@ -1067,7 +1068,7 @@ public class Manager {
             for (KhaosBlock khaosBlock : second) {
               // todo  process the exception carefully later
               try (ISession tmpSession = revokingStore.buildSession()) {
-                applyBlock(khaosBlock.getBlk().setSwitch(true));
+                applyBlock(khaosBlock.getBlk().setSwitch(true),true);
                 tmpSession.commit();
               } catch (AccountResourceInsufficientException
                   | ValidateSignatureException
@@ -1241,7 +1242,7 @@ public class Manager {
               long oldSolidNum =
                       chainBaseManager.getDynamicPropertiesStore().getLatestSolidifiedBlockNum();
 
-              applyBlock(newBlock, txs);
+              applyBlock(newBlock, txs,true);
               tmpSession.commit();
               // if event subscribe is enabled, post block trigger to queue
               postBlockTrigger(newBlock);
@@ -1332,7 +1333,7 @@ public class Manager {
   /**
    * Process transaction.
    */
-  public TransactionInfo processTransaction(final TransactionCapsule trxCap, BlockCapsule blockCap)
+  public TransactionInfo processTransaction(final TransactionCapsule trxCap, BlockCapsule blockCap, boolean isPush)
       throws ValidateSignatureException, ContractValidateException, ContractExeException,
       AccountResourceInsufficientException, TransactionExpirationException,
       TooBigTransactionException, TooBigTransactionResultException,
@@ -1340,6 +1341,7 @@ public class Manager {
     if (trxCap == null) {
       return null;
     }
+    long t1 = System.nanoTime();
     Contract contract = trxCap.getInstance().getRawData().getContract(0);
     Sha256Hash txId = trxCap.getTransactionId();
     final Histogram.Timer requestTimer = Metrics.histogramStartTimer(
@@ -1445,8 +1447,14 @@ public class Manager {
       logger.info("Process transaction {} cost {} ms during {}, {}",
              Hex.toHexString(transactionInfo.getId()), cost, type, contract.getType().name());
     }
+    printTransactionTime(System.nanoTime() - t1, isPush);
     Metrics.histogramObserve(requestTimer);
     return transactionInfo.getInstance();
+  }
+
+  private void printTransactionTime(long time, boolean isPush) {
+    logger.info("process trans "+isPush+" finish,allDbTime:"+0+",processAllTime="+time);
+
   }
 
   /**
@@ -1552,7 +1560,7 @@ public class Manager {
       // apply transaction
       try (ISession tmpSession = revokingStore.buildSession()) {
         accountStateCallBack.preExeTrans();
-        TransactionInfo result = processTransaction(trx, blockCapsule);
+        TransactionInfo result = processTransaction(trx, blockCapsule,true);
         accountStateCallBack.exeTransFinish();
         tmpSession.merge();
         blockCapsule.addTransaction(trx);
@@ -1632,7 +1640,7 @@ public class Manager {
   /**
    * process block.
    */
-  private void processBlock(BlockCapsule block, List<TransactionCapsule> txs)
+  private void processBlock(BlockCapsule block, List<TransactionCapsule> txs, boolean isPush)
       throws ValidateSignatureException, ContractValidateException, ContractExeException,
       AccountResourceInsufficientException, TaposException, TooBigTransactionException,
       DupTransactionException, TransactionExpirationException, ValidateScheduleException,
@@ -1670,7 +1678,7 @@ public class Manager {
           transactionCapsule.setVerified(true);
         }
         accountStateCallBack.preExeTrans();
-        TransactionInfo result = processTransaction(transactionCapsule, block);
+        TransactionInfo result = processTransaction(transactionCapsule, block,isPush);
         accountStateCallBack.exeTransFinish();
         if (Objects.nonNull(result)) {
           transactionRetCapsule.addTransactionInfo(result);
