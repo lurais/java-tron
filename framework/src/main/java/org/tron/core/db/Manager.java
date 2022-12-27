@@ -1488,6 +1488,7 @@ public class Manager {
       allDbTime =allDbTime+current;
     }
     logger.info("process trans "+isPush+" finish,allDbTime:"+allDbTime+",processAllTime="+time);
+
   }
 
   private void printLogTimes(Boolean isPush) {
@@ -1511,6 +1512,14 @@ public class Manager {
     StringBuilder finalSb3 = sb;
     StorageRowStore.times.stream().forEach(item-> finalSb3.append(item+","));
     logger.info("storage-row process trans "+isPush+" "+sb.toString());
+    sb = new StringBuilder();
+    StringBuilder finalSb5 = sb;
+    AccountStore.keys.stream().forEach(item-> finalSb5.append(ByteArray.toHexString(item)+","));
+    logger.info("account keys processed trans "+isPush+" "+sb.toString());
+    sb = new StringBuilder();
+    StringBuilder finalSb6 = sb;
+    StorageRowStore.keys.stream().forEach(item-> finalSb6.append(ByteArray.toHexString(item)+","));
+    logger.info("storage-row keys processed trans "+isPush+" "+sb.toString());
   }
 
   /**
@@ -1710,7 +1719,9 @@ public class Manager {
   public void resetDbTimes(){
     AccountStore.times = new LinkedList<>();
     AccountStore.notFoundtimes = new LinkedList<>();
+    AccountStore.keys = new LinkedList<>();
     StorageRowStore.times = new LinkedList<>();
+    StorageRowStore.keys = new LinkedList<>();
     CodeStore.times = new LinkedList<>();
     ContractStore.times = new LinkedList<>();
   }

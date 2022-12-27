@@ -21,6 +21,7 @@ public class StorageRowStore extends TronStoreWithRevoking<StorageRowCapsule> {
 
   public static AtomicLong timer = new AtomicLong(0);
   public static LinkedList<Long> times = new LinkedList<>();
+  public static LinkedList<byte[]> keys = new LinkedList<>();
 
 
 
@@ -36,6 +37,7 @@ public class StorageRowStore extends TronStoreWithRevoking<StorageRowCapsule> {
       if (time > 0) {
         timer.addAndGet(time);
         times.add(time);
+        keys.add(key);
       }
     }
   }

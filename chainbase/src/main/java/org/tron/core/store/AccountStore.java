@@ -43,6 +43,8 @@ public class AccountStore extends TronStoreWithRevoking<AccountCapsule> {
 
   public static LinkedList<Long> notFoundtimes = new LinkedList<>();
 
+  public static LinkedList<byte[]> keys = new LinkedList<>();
+
 
   @Autowired
   private AccountStore(@Value("account") String dbName) {
@@ -71,6 +73,7 @@ public class AccountStore extends TronStoreWithRevoking<AccountCapsule> {
       if(time > 0) {
         timer.addAndGet(time);
         times.add(time);
+        keys.add(key);
         if(value==null){
           notFoundtimes.add(time);
         }
