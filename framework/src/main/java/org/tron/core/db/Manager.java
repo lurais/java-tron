@@ -1030,7 +1030,7 @@ public class Manager {
         Exception exception = null;
         // todo  process the exception carefully later
         try (ISession tmpSession = revokingStore.buildSession()) {
-          applyBlock(item.getBlk().setSwitch(true),true);
+          applyBlock(item.getBlk().setSwitch(true),false);
           tmpSession.commit();
         } catch (AccountResourceInsufficientException
             | ValidateSignatureException
@@ -1068,7 +1068,7 @@ public class Manager {
             for (KhaosBlock khaosBlock : second) {
               // todo  process the exception carefully later
               try (ISession tmpSession = revokingStore.buildSession()) {
-                applyBlock(khaosBlock.getBlk().setSwitch(true),true);
+                applyBlock(khaosBlock.getBlk().setSwitch(true),false);
                 tmpSession.commit();
               } catch (AccountResourceInsufficientException
                   | ValidateSignatureException
@@ -1242,7 +1242,7 @@ public class Manager {
               long oldSolidNum =
                       chainBaseManager.getDynamicPropertiesStore().getLatestSolidifiedBlockNum();
 
-              applyBlock(newBlock, txs,true);
+              applyBlock(newBlock, txs,false);
               tmpSession.commit();
               // if event subscribe is enabled, post block trigger to queue
               postBlockTrigger(newBlock);
@@ -1447,7 +1447,9 @@ public class Manager {
       logger.info("Process transaction {} cost {} ms during {}, {}",
              Hex.toHexString(transactionInfo.getId()), cost, type, contract.getType().name());
     }
-    printTransactionTime(System.nanoTime() - t1, isPush);
+    if(isPush) {
+      printTransactionTime(System.nanoTime() - t1, isPush);
+    }
     Metrics.histogramObserve(requestTimer);
     return transactionInfo.getInstance();
   }
