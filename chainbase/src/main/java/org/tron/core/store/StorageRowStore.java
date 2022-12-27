@@ -33,12 +33,12 @@ public class StorageRowStore extends TronStoreWithRevoking<StorageRowCapsule> {
       row.setRowKey(key);
       return row;
     }finally {
-      long time = System.nanoTime() - start;
-      if (time > 1000000) {
-        timer.addAndGet(time);
-        times.add(time);
-        keys.add(key);
-      }
+//      long time = System.nanoTime() - start;
+//      if (time > 0) {
+//        timer.addAndGet(time);
+//        times.add(time);
+//        keys.add(key);
+//      }
     }
   }
 }
