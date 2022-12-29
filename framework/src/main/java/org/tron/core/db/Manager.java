@@ -1331,7 +1331,7 @@ public class Manager {
     if (trxCap == null) {
       return null;
     }
-    resetDbTimes();
+    //resetDbTimes();
     long t1 = System.nanoTime();
     Contract contract = trxCap.getInstance().getRawData().getContract(0);
     Sha256Hash txId = trxCap.getTransactionId();
