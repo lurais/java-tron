@@ -68,15 +68,14 @@ public class AccountStore extends TronStoreWithRevoking<AccountCapsule> {
       value = revokingDB.getUnchecked(key);
       return ArrayUtils.isEmpty(value) ? null : new AccountCapsule(value);
     }finally {
-//      long time = System.nanoTime()-start;
-//      if(time > 1000000) {
-//        timer.addAndGet(time);
-//        times.add(time);
-//        keys.add(key);
-//        if(value==null){
-//          notFoundtimes.add(time);
-//        }
-//      }
+      long time = System.nanoTime()-start;
+      if(time > 0) {
+        times.add(time);
+        keys.add(key);
+        if(value==null){
+          notFoundtimes.add(time);
+        }
+      }
     }
   }
 

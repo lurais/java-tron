@@ -35,6 +35,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import javax.annotation.PostConstruct;
@@ -1030,7 +1031,7 @@ public class Manager {
         Exception exception = null;
         // todo  process the exception carefully later
         try (ISession tmpSession = revokingStore.buildSession()) {
-          applyBlock(item.getBlk().setSwitch(true),false);
+          applyBlock(item.getBlk().setSwitch(true),true);
           tmpSession.commit();
         } catch (AccountResourceInsufficientException
             | ValidateSignatureException
@@ -1068,7 +1069,7 @@ public class Manager {
             for (KhaosBlock khaosBlock : second) {
               // todo  process the exception carefully later
               try (ISession tmpSession = revokingStore.buildSession()) {
-                applyBlock(khaosBlock.getBlk().setSwitch(true),false);
+                applyBlock(khaosBlock.getBlk().setSwitch(true),true);
                 tmpSession.commit();
               } catch (AccountResourceInsufficientException
                   | ValidateSignatureException
@@ -1267,7 +1268,7 @@ public class Manager {
               long oldSolidNum =
                       chainBaseManager.getDynamicPropertiesStore().getLatestSolidifiedBlockNum();
 
-              applyBlock(newBlock, txs,false);
+              applyBlock(newBlock, txs,true);
               tmpSession.commit();
               // if event subscribe is enabled, post block trigger to queue
               postBlockTrigger(newBlock);
@@ -1473,8 +1474,9 @@ public class Manager {
       logger.info("Process transaction {} cost {} ms during {}, {}",
              Hex.toHexString(transactionInfo.getId()), cost, type, contract.getType().name());
     }
-    if(isPush) {
+    if(!isPush) {
       printTransactionTime(System.nanoTime() - t1, isPush);
+      printLogTimes(isPush);
     }
     Metrics.histogramObserve(requestTimer);
     return transactionInfo.getInstance();
@@ -1482,6 +1484,34 @@ public class Manager {
 
   private void printTransactionTime(long time, boolean isPush) {
     logger.info("process trans "+isPush+" finish,allDbTime:"+0+",processAllTime="+time);
+  }
+
+  private void printLogTimes(Boolean isPush) {
+    StringBuilder sb = new StringBuilder();
+    StringBuilder finalSb = sb;
+    AccountStore.times.stream().forEach(item-> finalSb.append(item+","));
+    logger.info("account process trans "+isPush+" "+sb.toString());
+    sb = new StringBuilder();
+    StringBuilder finalSb4 = sb;
+    AccountStore.notFoundtimes.stream().forEach(item-> finalSb4.append(item+","));
+    logger.info("account notFound process trans "+isPush+" "+sb.toString());
+    sb = new StringBuilder();
+    StringBuilder finalSb6 = sb;
+    AccountStore.keys.stream().forEach(item-> finalSb6.append(ByteArray.toHexString(item)+","));
+    logger.info("account keys processed trans "+isPush+" "+sb.toString());
+
+    sb = new StringBuilder();
+    StringBuilder finalSb3 = sb;
+    StorageRowStore.times.stream().forEach(item-> finalSb3.append(item+","));
+    logger.info("storage-row process trans "+isPush+" "+sb.toString());
+    sb = new StringBuilder();
+    StringBuilder finalSb7 = sb;
+    StorageRowStore.notFoundtimes.stream().forEach(item-> finalSb7.append(item+","));
+    logger.info("storage-row notFound process trans "+isPush+" "+sb.toString());
+    sb = new StringBuilder();
+    StringBuilder finalSb5 = sb;
+    StorageRowStore.keys.stream().forEach(item-> finalSb5.append(ByteArray.toHexString(item)+","));
+    logger.info("storage-row keys processed trans "+isPush+" "+sb.toString());
 
   }
 
