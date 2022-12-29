@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.Getter;
+import lombok.Synchronized;
 import org.tron.common.cache.CacheManager;
 import org.tron.common.cache.TronCache;
 import org.tron.common.parameter.CommonParameter;
@@ -20,6 +21,7 @@ import org.tron.core.db2.common.DB;
 import org.tron.core.db2.common.Flusher;
 import org.tron.core.db2.common.WrappedByteArray;
 import org.tron.core.store.AccountAssetStore;
+import org.tron.core.store.AccountStore;
 
 public class SnapshotRoot extends AbstractSnapshot<byte[], byte[]> {
 
@@ -67,9 +69,11 @@ public class SnapshotRoot extends AbstractSnapshot<byte[], byte[]> {
     }finally {
       time=System.nanoTime()-start;
       if(getDbName().equals("account")||getDbName().equals("storage-row")) {
-        times.add(time);
-        if(!find){
-          notFoundtimes.add(time);
+        synchronized (AccountStore.class) {
+          times.add(time);
+          if (!find) {
+            notFoundtimes.add(time);
+          }
         }
       }
     }

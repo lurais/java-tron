@@ -38,9 +38,11 @@ public class StorageRowStore extends TronStoreWithRevoking<StorageRowCapsule> {
       row.setRowKey(key);
       return row;
     }finally {
-      times.add(time);
-      if(!find){
-        notFoundtimes.add(time);
+      synchronized (AccountStore.class) {
+        times.add(time);
+        if (!find) {
+          notFoundtimes.add(time);
+        }
       }
     }
   }

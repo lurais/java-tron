@@ -70,9 +70,11 @@ public class AccountStore extends TronStoreWithRevoking<AccountCapsule> {
       return ArrayUtils.isEmpty(value) ? null : new AccountCapsule(value);
     }finally {
       long time = System.nanoTime()-start;
-      times.add(time);
-      if(value==null){
-        notFoundtimes.add(time);
+      synchronized (AccountStore.class) {
+        times.add(time);
+        if (value == null) {
+          notFoundtimes.add(time);
+        }
       }
     }
   }

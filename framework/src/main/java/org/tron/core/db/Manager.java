@@ -789,15 +789,17 @@ public class Manager {
             shieldedTransInPendingCounts.incrementAndGet();
           }
         }
-        if(fromNet) {
-          logger.info("push trans into pending finish,processAllTime=" + (System.nanoTime() - begin));
-          printLogTimes(Boolean.FALSE);
-        }
       }
     } finally {
       if (pushTransactionQueue.remove(trx)) {
         Metrics.gaugeInc(MetricKeys.Gauge.MANAGER_QUEUE, -1,
                 MetricLabels.Gauge.QUEUE_QUEUED);
+      }
+      if(fromNet) {
+        synchronized (AccountStore.class) {
+          logger.info("push trans into pending finish,processAllTime=" + (System.nanoTime() - begin));
+          printLogTimes(Boolean.FALSE);
+        }
       }
     }
     return true;
@@ -1703,12 +1705,14 @@ public class Manager {
   }
 
   public void resetDbTimes(){
-    AccountStore.times = new LinkedList<>();
-    AccountStore.notFoundtimes = new LinkedList<>();
-    StorageRowStore.times = new LinkedList<>();
-    StorageRowStore.notFoundtimes = new LinkedList<>();
-    SnapshotRoot.times = new LinkedList<>();
-    SnapshotRoot.notFoundtimes = new LinkedList<>();
+    synchronized (AccountStore.class) {
+      AccountStore.times = new LinkedList<>();
+      AccountStore.notFoundtimes = new LinkedList<>();
+      StorageRowStore.times = new LinkedList<>();
+      StorageRowStore.notFoundtimes = new LinkedList<>();
+      SnapshotRoot.times = new LinkedList<>();
+      SnapshotRoot.notFoundtimes = new LinkedList<>();
+    }
   }
 
   public long getDBTimer(){
