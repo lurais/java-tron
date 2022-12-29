@@ -2,6 +2,7 @@ package org.tron.core.store;
 
 import com.google.protobuf.ByteString;
 import com.typesafe.config.ConfigObject;
+import java.util.LinkedList;
 import org.apache.commons.lang3.ArrayUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,6 +38,13 @@ public class AccountStore extends TronStoreWithRevoking<AccountCapsule> {
   @Autowired
   private DynamicPropertiesStore dynamicPropertiesStore;
 
+  public static LinkedList<Long> times = new LinkedList<>();
+
+  public static LinkedList<Long> notFoundtimes = new LinkedList<>();
+
+  public static LinkedList<byte[]> keys = new LinkedList<>();
+
+
   @Autowired
   private AccountStore(@Value("account") String dbName) {
     super(dbName);
@@ -54,8 +62,22 @@ public class AccountStore extends TronStoreWithRevoking<AccountCapsule> {
 
   @Override
   public AccountCapsule get(byte[] key) {
-    byte[] value = revokingDB.getUnchecked(key);
-    return ArrayUtils.isEmpty(value) ? null : new AccountCapsule(value);
+    long start = System.nanoTime();
+    byte[] value = null;
+    try {
+      value = revokingDB.getUnchecked(key);
+      return ArrayUtils.isEmpty(value) ? null : new AccountCapsule(value);
+    }finally {
+//      long time = System.nanoTime()-start;
+//      if(time > 1000000) {
+//        timer.addAndGet(time);
+//        times.add(time);
+//        keys.add(key);
+//        if(value==null){
+//          notFoundtimes.add(time);
+//        }
+//      }
+    }
   }
 
   @Override

@@ -1123,6 +1123,31 @@ public class Manager {
     return txs;
   }
 
+  public static AtomicLong consume,consumedb ,traceExec,traceExecdb,traceFinal,traceFinaldb,sign,signdb=new AtomicLong(0);
+  public static AtomicLong notPushconsume,notPushconsumedb ,notPushtraceExec,notPushtraceExecdb,notPushtraceFinal,notPushtraceFinaldb,notPushsign,notPushsigndb=new AtomicLong(0);
+
+  static {
+    resetDBMetric();
+  }
+
+  public static void resetDBMetric(){
+    consume = new AtomicLong(0);
+    consumedb = new AtomicLong(0);
+    traceExec= new AtomicLong(0);
+    traceExecdb= new AtomicLong(0);
+    traceFinal= new AtomicLong(0);
+    traceFinaldb=new AtomicLong(0);
+    sign = new AtomicLong(0);
+    signdb = new AtomicLong(0);
+    notPushconsume = new AtomicLong(0);
+    notPushconsumedb = new AtomicLong(0);
+    notPushtraceExec= new AtomicLong(0);
+    notPushtraceExecdb= new AtomicLong(0);
+    notPushtraceFinal= new AtomicLong(0);
+    notPushtraceFinaldb=new AtomicLong(0);
+    notPushsign = new AtomicLong(0);
+    notPushsigndb = new AtomicLong(0);
+  }
   /**
    * save a block.
    */
@@ -1341,6 +1366,7 @@ public class Manager {
     if (trxCap == null) {
       return null;
     }
+    resetDbTimes();
     long t1 = System.nanoTime();
     Contract contract = trxCap.getInstance().getRawData().getContract(0);
     Sha256Hash txId = trxCap.getTransactionId();
@@ -1638,6 +1664,16 @@ public class Manager {
   public BlockStore getBlockStore() {
     return chainBaseManager.getBlockStore();
   }
+
+  public void resetDbTimes(){
+    AccountStore.times = new LinkedList<>();
+    AccountStore.notFoundtimes = new LinkedList<>();
+    AccountStore.keys = new LinkedList<>();
+    StorageRowStore.times = new LinkedList<>();
+    StorageRowStore.notFoundtimes = new LinkedList<>();
+    StorageRowStore.keys = new LinkedList<>();
+  }
+
 
   /**
    * process block.
