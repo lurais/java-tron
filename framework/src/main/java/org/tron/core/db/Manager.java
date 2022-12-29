@@ -744,7 +744,8 @@ public class Manager {
           AccountResourceInsufficientException, DupTransactionException, TaposException,
           TooBigTransactionException, TransactionExpirationException,
           ReceiptCheckErrException, VMIllegalException, TooBigTransactionResultException {
-
+    long begin = System.nanoTime();
+    resetDbTimes();
     if (isShieldedTransaction(trx.getInstance()) && !Args.getInstance()
             .isFullNodeAllowShieldedTransactionArgs()) {
       return true;
@@ -801,6 +802,8 @@ public class Manager {
         Metrics.gaugeInc(MetricKeys.Gauge.MANAGER_QUEUE, -1,
                 MetricLabels.Gauge.QUEUE_QUEUED);
       }
+      logger.info("push trans into pending finish,processAllTime="+(System.nanoTime()-begin));
+      printLogTimes(Boolean.FALSE);
     }
     return true;
   }
@@ -840,7 +843,7 @@ public class Manager {
       TooBigTransactionResultException {
     long start = System.nanoTime();
     try {
-     resetDBTimer();
+//     resetDBTimer();
      BandwidthProcessor processor = new BandwidthProcessor(chainBaseManager);
      processor.consume(trx, trace);
    }finally {
@@ -1375,7 +1378,7 @@ public class Manager {
 
     trace.init(blockCap, eventPluginLoaded);
     trace.checkIsConstant();
-    resetDBTimer();
+//    resetDBTimer();
     long start1 = System.nanoTime();
     trace.exec();
 //    if(isPush){
@@ -1391,7 +1394,7 @@ public class Manager {
       if (trace.checkNeedRetry()) {
         trace.init(blockCap, eventPluginLoaded);
         trace.checkIsConstant();
-        resetDBTimer();
+//        resetDBTimer();
         long start2 = System.nanoTime();
         trace.exec();
 //        if(isPush){
@@ -1411,7 +1414,7 @@ public class Manager {
     }
 
     long start3 = System.nanoTime();
-    resetDBTimer();
+//    resetDBTimer();
     trace.finalization();
 //    if(isPush){
 //     Manager.traceFinal.addAndGet(System.nanoTime()-start3);
@@ -1465,10 +1468,6 @@ public class Manager {
       logger.info("Process transaction {} cost {} ms during {}, {}",
               Hex.toHexString(transactionInfo.getId()), cost, type, contract.getType().name());
     }
-    if(isPush) {
-      printTransactionTime(System.nanoTime() - t1, isPush);
-      printLogTimes(isPush);
-    }
     Metrics.histogramObserve(requestTimer);
     return transactionInfo.getInstance();
   }
@@ -1492,34 +1491,22 @@ public class Manager {
   }
 
   private void printLogTimes(Boolean isPush) {
-//    StringBuilder sb = new StringBuilder();
-//    StringBuilder finalSb = sb;
-//    AccountStore.times.stream().forEach(item-> finalSb.append(item+","));
-//    logger.info("account process trans "+isPush+" "+sb.toString());
-//    sb = new StringBuilder();
-//    StringBuilder finalSb4 = sb;
-//    AccountStore.notFoundtimes.stream().forEach(item-> finalSb4.append(item+","));
-//    logger.info("account notFound process trans "+isPush+" "+sb.toString());
-//    sb = new StringBuilder();
-//    StringBuilder finalSb1 = sb;
-//    CodeStore.times.stream().forEach(item-> finalSb1.append(item+","));
-//    logger.info("code process trans "+isPush+" "+sb.toString());
-//    sb = new StringBuilder();
-//    StringBuilder finalSb2 = sb;
-//    ContractStore.times.stream().forEach(item-> finalSb2.append(item+","));
-//    logger.info("contract process trans "+isPush+" "+sb.toString());
-//    sb = new StringBuilder();
-//    StringBuilder finalSb3 = sb;
-//    StorageRowStore.times.stream().forEach(item-> finalSb3.append(item+","));
-//    logger.info("storage-row process trans "+isPush+" "+sb.toString());
-//    sb = new StringBuilder();
-//    StringBuilder finalSb5 = sb;
-//    AccountStore.keys.stream().forEach(item-> finalSb5.append(ByteArray.toHexString(item)+","));
-//    logger.info("account keys processed trans "+isPush+" "+sb.toString());
-//    sb = new StringBuilder();
-//    StringBuilder finalSb6 = sb;
-//    StorageRowStore.keys.stream().forEach(item-> finalSb6.append(ByteArray.toHexString(item)+","));
-//    logger.info("storage-row keys processed trans "+isPush+" "+sb.toString());
+    StringBuilder sb = new StringBuilder();
+    StringBuilder finalSb = sb;
+    AccountStore.times.stream().forEach(item-> finalSb.append(item+","));
+    logger.info("account process trans "+isPush+" "+sb.toString());
+    sb = new StringBuilder();
+    StringBuilder finalSb4 = sb;
+    AccountStore.notFoundtimes.stream().forEach(item-> finalSb4.append(item+","));
+    logger.info("account notFound process trans "+isPush+" "+sb.toString());
+    sb = new StringBuilder();
+    StringBuilder finalSb3 = sb;
+    StorageRowStore.times.stream().forEach(item-> finalSb3.append(item+","));
+    logger.info("storage-row process trans "+isPush+" "+sb.toString());
+    sb = new StringBuilder();
+    StringBuilder finalSb5 = sb;
+    StorageRowStore.notFoundtimes.stream().forEach(item-> finalSb5.append(item+","));
+    logger.info("storage-row notFound process trans "+isPush+" "+sb.toString());
   }
 
   /**
@@ -1717,13 +1704,10 @@ public class Manager {
   }
 
   public void resetDbTimes(){
-//    AccountStore.times = new LinkedList<>();
-//    AccountStore.notFoundtimes = new LinkedList<>();
-//    AccountStore.keys = new LinkedList<>();
-//    StorageRowStore.times = new LinkedList<>();
-//    StorageRowStore.keys = new LinkedList<>();
-//    CodeStore.times = new LinkedList<>();
-//    ContractStore.times = new LinkedList<>();
+    AccountStore.times = new LinkedList<>();
+    AccountStore.notFoundtimes = new LinkedList<>();
+    StorageRowStore.times = new LinkedList<>();
+    StorageRowStore.notFoundtimes = new LinkedList<>();
   }
 
   public long getDBTimer(){
@@ -1755,7 +1739,7 @@ public class Manager {
     chainBaseManager.getDynamicPropertiesStore().saveBlockEnergyUsage(0);
     //parallel check sign
     if (!block.generatedByMyself) {
-      resetDBTimer();
+//      resetDBTimer();
       long tv = System.nanoTime();
       try {
         preValidateTransactionSign(txs);

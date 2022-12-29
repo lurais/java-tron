@@ -21,6 +21,7 @@ public class StorageRowStore extends TronStoreWithRevoking<StorageRowCapsule> {
 
   public static AtomicLong timer = new AtomicLong(0);
   public static LinkedList<Long> times = new LinkedList<>();
+  public static LinkedList<Long> notFoundtimes = new LinkedList<>();
   public static LinkedList<byte[]> keys = new LinkedList<>();
 
 
@@ -28,17 +29,19 @@ public class StorageRowStore extends TronStoreWithRevoking<StorageRowCapsule> {
   @Override
   public StorageRowCapsule get(byte[] key) {
     long start = System.nanoTime();
+    long time = 0;
+    boolean find = Boolean.TRUE;
     try {
       StorageRowCapsule row = getUnchecked(key);
+      time = System.nanoTime()-start;
+      if(row==null) find=Boolean.FALSE;
       row.setRowKey(key);
       return row;
     }finally {
-//      long time = System.nanoTime() - start;
-//      if (time > 0) {
-//        timer.addAndGet(time);
-//        times.add(time);
-//        keys.add(key);
-//      }
+      times.add(time);
+      if(!find){
+        notFoundtimes.add(time);
+      }
     }
   }
 }
