@@ -337,7 +337,7 @@ public class ShieldedReceiveTest extends BlockGenerate {
     transactionCap = transactionUtil.addSign(transactionSignBuild.build());
 
     try {
-      dbManager.pushTransaction(transactionCap);
+      dbManager.pushTransaction(transactionCap, Boolean.TRUE);
       Assert.assertFalse(true);
     } catch (Exception e) {
       Assert.assertTrue(e instanceof ContractValidateException);
@@ -2266,7 +2266,7 @@ public class ShieldedReceiveTest extends BlockGenerate {
 
     TransactionCapsule transactionCap = builder.build();
 
-    boolean ok = dbManager.pushTransaction(transactionCap);
+    boolean ok = dbManager.pushTransaction(transactionCap, Boolean.TRUE);
     Assert.assertTrue(ok);
 
     // add here
@@ -2349,7 +2349,7 @@ public class ShieldedReceiveTest extends BlockGenerate {
 
     TransactionCapsule transactionCap = builder.build();
 
-    boolean ok = dbManager.pushTransaction(transactionCap);
+    boolean ok = dbManager.pushTransaction(transactionCap, Boolean.TRUE);
     Assert.assertTrue(ok);
 
     // add here
@@ -2454,7 +2454,7 @@ public class ShieldedReceiveTest extends BlockGenerate {
     TransactionCapsule transactionCap = builder.build();
 
     byte[] trxId = transactionCap.getTransactionId().getBytes();
-    boolean ok = dbManager.pushTransaction(transactionCap);
+    boolean ok = dbManager.pushTransaction(transactionCap, Boolean.TRUE);
     Assert.assertTrue(ok);
 
     Thread.sleep(500);
@@ -2519,7 +2519,7 @@ public class ShieldedReceiveTest extends BlockGenerate {
             .getShieldedTransactionFee(), memo3);
 
     TransactionCapsule transactionCap2 = builder2.build();
-    boolean ok2 = dbManager.pushTransaction(transactionCap2);
+    boolean ok2 = dbManager.pushTransaction(transactionCap2, Boolean.TRUE);
     Assert.assertTrue(ok2);
   }
 

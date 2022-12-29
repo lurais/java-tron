@@ -491,7 +491,7 @@ public class SendCoinShieldTest {
 
     TransactionCapsule transactionCap = builder.build();
 
-    boolean ok = dbManager.pushTransaction(transactionCap);
+    boolean ok = dbManager.pushTransaction(transactionCap, Boolean.TRUE);
     Assert.assertTrue(ok);
 
     // add here
@@ -577,7 +577,7 @@ public class SendCoinShieldTest {
             memo);
 
     TransactionCapsule transactionCap = builder.build();
-    boolean ok = dbManager.pushTransaction(transactionCap);
+    boolean ok = dbManager.pushTransaction(transactionCap, Boolean.TRUE);
     Assert.assertTrue(ok);
 
     // add here
@@ -760,7 +760,7 @@ public class SendCoinShieldTest {
     builder.addOutput(fullViewingKey.getOvk(), paymentAddress,
         4010 * 1000000L - wallet.getShieldedTransactionFee(), new byte[512]);
     TransactionCapsule transactionCap = builder.build();
-    boolean ok = dbManager.pushTransaction(transactionCap);
+    boolean ok = dbManager.pushTransaction(transactionCap, Boolean.TRUE);
     JLibrustzcash.librustzcashSaplingProvingCtxFree(ctx);
     Assert.assertTrue(ok);
   }

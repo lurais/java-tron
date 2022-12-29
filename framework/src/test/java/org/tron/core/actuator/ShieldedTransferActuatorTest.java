@@ -238,7 +238,7 @@ public class ShieldedTransferActuatorTest {
           ByteArray.fromHexString(ADDRESS_ONE_PRIVATE_KEY)));
       transactionCap = transactionUtil.addSign(transactionSignBuild.build());
 
-      Assert.assertTrue(dbManager.pushTransaction(transactionCap));
+      Assert.assertTrue(dbManager.pushTransaction(transactionCap, Boolean.TRUE));
     } catch (Exception e) {
       System.out.println(e.getMessage());
       Assert.assertTrue(false);
@@ -269,7 +269,7 @@ public class ShieldedTransferActuatorTest {
           ByteArray.fromHexString(ADDRESS_ONE_PRIVATE_KEY)));
       transactionCap = transactionUtil.addSign(transactionSignBuild.build());
 
-      Assert.assertTrue(dbManager.pushTransaction(transactionCap));
+      Assert.assertTrue(dbManager.pushTransaction(transactionCap, Boolean.TRUE));
     } catch (Exception e) {
       System.out.println(e.getMessage());
       Assert.assertTrue(false);
@@ -307,7 +307,7 @@ public class ShieldedTransferActuatorTest {
     dbManager.getDynamicPropertiesStore().saveAllowShieldedTransaction(1);
     try {
       TransactionCapsule transactionCap = getPublicToShieldedTransaction();
-      Assert.assertTrue(dbManager.pushTransaction(transactionCap));
+      Assert.assertTrue(dbManager.pushTransaction(transactionCap, Boolean.TRUE));
     } catch (ValidateSignatureException e) {
       Assert.assertTrue(e instanceof ValidateSignatureException);
       Assert.assertEquals("miss sig or contract", e.getMessage());
@@ -442,7 +442,7 @@ public class ShieldedTransferActuatorTest {
       long freeNetUsage = accountCapsule.getFreeNetUsage();
       long assertBalance = getAssertBalance(accountCapsule);
 
-      Assert.assertTrue(dbManager.pushTransaction(transactionCap));
+      Assert.assertTrue(dbManager.pushTransaction(transactionCap, Boolean.TRUE));
 
       accountCapsule =
           dbManager.getAccountStore().get(ByteArray.fromHexString(PUBLIC_ADDRESS_ONE));
@@ -1026,7 +1026,7 @@ public class ShieldedTransferActuatorTest {
           ByteArray.fromHexString(ADDRESS_ONE_PRIVATE_KEY)));
       transactionCapOne = transactionUtil.addSign(transactionSignBuild.build());
 
-      Assert.assertTrue(dbManager.pushTransaction(transactionCapOne));
+      Assert.assertTrue(dbManager.pushTransaction(transactionCapOne, Boolean.TRUE));
       AccountCapsule accountCapsuleOne =
           dbManager.getAccountStore().get(ByteArray.fromHexString(PUBLIC_ADDRESS_ONE));
       Assert.assertEquals(getAssertBalance(accountCapsuleOne),

@@ -23,16 +23,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.PriorityBlockingQueue;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -127,7 +118,6 @@ import org.tron.core.service.MortgageService;
 import org.tron.core.store.*;
 import org.tron.core.utils.TransactionRegister;
 import org.tron.core.vm.config.VMConfig;
-import org.tron.core.vm.program.Storage;
 import org.tron.protos.Protocol;
 import org.tron.protos.Protocol.AccountType;
 import org.tron.protos.Protocol.Permission;
@@ -740,13 +730,15 @@ public class Manager {
   /**
    * push transaction into pending.
    */
-  public boolean pushTransaction(final TransactionCapsule trx)
+  public boolean pushTransaction(final TransactionCapsule trx, Boolean fromNet)
           throws ValidateSignatureException, ContractValidateException, ContractExeException,
           AccountResourceInsufficientException, DupTransactionException, TaposException,
           TooBigTransactionException, TransactionExpirationException,
           ReceiptCheckErrException, VMIllegalException, TooBigTransactionResultException {
     long begin = System.nanoTime();
-    resetDbTimes();
+    if(fromNet) {
+      resetDbTimes();
+    }
     if (isShieldedTransaction(trx.getInstance()) && !Args.getInstance()
             .isFullNodeAllowShieldedTransactionArgs()) {
       return true;
@@ -797,14 +789,16 @@ public class Manager {
             shieldedTransInPendingCounts.incrementAndGet();
           }
         }
+        if(fromNet) {
+          logger.info("push trans into pending finish,processAllTime=" + (System.nanoTime() - begin));
+          printLogTimes(Boolean.FALSE);
+        }
       }
     } finally {
       if (pushTransactionQueue.remove(trx)) {
         Metrics.gaugeInc(MetricKeys.Gauge.MANAGER_QUEUE, -1,
                 MetricLabels.Gauge.QUEUE_QUEUED);
       }
-      logger.info("push trans into pending finish,processAllTime="+(System.nanoTime()-begin));
-      printLogTimes(Boolean.FALSE);
     }
     return true;
   }
@@ -1494,23 +1488,23 @@ public class Manager {
   private void printLogTimes(Boolean isPush) {
     StringBuilder sb = new StringBuilder();
     StringBuilder finalSb = sb;
-    AccountStore.times.stream().forEach(item-> finalSb.append(item+","));
+    new CopyOnWriteArrayList<>(AccountStore.times).stream().forEach(item-> finalSb.append(item+","));
     logger.info("account process trans "+isPush+" "+sb.toString());
     sb = new StringBuilder();
     StringBuilder finalSb4 = sb;
-    AccountStore.notFoundtimes.stream().forEach(item-> finalSb4.append(item+","));
+    new CopyOnWriteArrayList<>(AccountStore.notFoundtimes).stream().forEach(item-> finalSb4.append(item+","));
     logger.info("account notFound process trans "+isPush+" "+sb.toString());
     sb = new StringBuilder();
     StringBuilder finalSb3 = sb;
-    StorageRowStore.times.stream().forEach(item-> finalSb3.append(item+","));
+    new CopyOnWriteArrayList<>(StorageRowStore.times).stream().forEach(item-> finalSb3.append(item+","));
     logger.info("storage-row process trans "+isPush+" "+sb.toString());
     sb = new StringBuilder();
     StringBuilder finalSb5 = sb;
-    StorageRowStore.notFoundtimes.stream().forEach(item-> finalSb5.append(item+","));
+    new CopyOnWriteArrayList<>(StorageRowStore.notFoundtimes).stream().forEach(item-> finalSb5.append(item+","));
     logger.info("storage-row notFound process trans "+isPush+" "+sb.toString());
     sb = new StringBuilder();
     StringBuilder finalSb6 = sb;
-    SnapshotRoot.notFoundtimes.stream().forEach(item-> finalSb6.append(item+","));
+    new CopyOnWriteArrayList<>(SnapshotRoot.notFoundtimes).stream().forEach(item-> finalSb6.append(item+","));
     logger.info("account and storage-row db notFound process trans "+isPush+" "+sb.toString());
   }
 
@@ -2021,7 +2015,7 @@ public class Manager {
     }
 
     try {
-      this.pushTransaction(tx);
+      this.pushTransaction(tx,Boolean.FALSE);
     } catch (ValidateSignatureException | ContractValidateException | ContractExeException
             | AccountResourceInsufficientException | VMIllegalException e) {
       logger.debug(e.getMessage(), e);
