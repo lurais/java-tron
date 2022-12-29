@@ -1714,6 +1714,7 @@ public class Manager {
     StorageRowStore.times = new LinkedList<>();
     StorageRowStore.notFoundtimes = new LinkedList<>();
     SnapshotRoot.times = new LinkedList<>();
+    SnapshotRoot.notFoundtimes = new LinkedList<>();
   }
 
   public long getDBTimer(){
