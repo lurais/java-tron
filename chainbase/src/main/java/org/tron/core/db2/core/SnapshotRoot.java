@@ -4,6 +4,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Streams;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -26,6 +27,11 @@ public class SnapshotRoot extends AbstractSnapshot<byte[], byte[]> {
   private Snapshot solidity;
   private boolean isAccountDB;
 
+  public static LinkedList<Long> times = new LinkedList<>();
+  public static LinkedList<Long> notFoundtimes = new LinkedList<>();
+
+
+
   private TronCache<WrappedByteArray, WrappedByteArray> cache;
   private static final List<String> CACHE_DBS = CommonParameter.getInstance()
       .getStorage().getCacheDbs();
@@ -46,13 +52,27 @@ public class SnapshotRoot extends AbstractSnapshot<byte[], byte[]> {
 
   @Override
   public byte[] get(byte[] key) {
-    WrappedByteArray cache = getCache(key);
-    if (cache != null) {
-      return cache.getBytes();
+    long start = System.nanoTime();
+    long time = 0;
+    Boolean find = Boolean.TRUE;
+    try {
+      WrappedByteArray cache = getCache(key);
+      if (cache != null) {
+        return cache.getBytes();
+      }
+      byte[] value = db.get(key);
+      if(value==null) find=Boolean.FALSE;
+      putCache(key, value);
+      return value;
+    }finally {
+      time=System.nanoTime()-start;
+      if(getDbName().equals("account")||getDbName().equals("storage-row")) {
+        times.add(time);
+        if(!find){
+          notFoundtimes.add(time);
+        }
+      }
     }
-    byte[] value = db.get(key);
-    putCache(key, value);
-    return value;
   }
 
   @Override

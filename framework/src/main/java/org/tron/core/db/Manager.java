@@ -98,6 +98,7 @@ import org.tron.core.db2.ISession;
 import org.tron.core.db2.core.Chainbase;
 import org.tron.core.db2.core.ITronChainBase;
 import org.tron.core.db2.core.SnapshotManager;
+import org.tron.core.db2.core.SnapshotRoot;
 import org.tron.core.exception.AccountResourceInsufficientException;
 import org.tron.core.exception.BadBlockException;
 import org.tron.core.exception.BadItemException;
@@ -1507,6 +1508,10 @@ public class Manager {
     StringBuilder finalSb5 = sb;
     StorageRowStore.notFoundtimes.stream().forEach(item-> finalSb5.append(item+","));
     logger.info("storage-row notFound process trans "+isPush+" "+sb.toString());
+    sb = new StringBuilder();
+    StringBuilder finalSb6 = sb;
+    SnapshotRoot.notFoundtimes.stream().forEach(item-> finalSb6.append(item+","));
+    logger.info("account and storage-row db notFound process trans "+isPush+" "+sb.toString());
   }
 
   /**
@@ -1708,6 +1713,7 @@ public class Manager {
     AccountStore.notFoundtimes = new LinkedList<>();
     StorageRowStore.times = new LinkedList<>();
     StorageRowStore.notFoundtimes = new LinkedList<>();
+    SnapshotRoot.times = new LinkedList<>();
   }
 
   public long getDBTimer(){
