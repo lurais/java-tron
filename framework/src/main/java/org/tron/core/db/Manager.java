@@ -1508,7 +1508,7 @@ public class Manager {
     logger.info("storage-row notFound process trans "+isPush+" "+sb.toString());
     sb = new StringBuilder();
     StringBuilder finalSb6 = sb;
-    new CopyOnWriteArrayList<>(SnapshotRoot.notFoundtimes).stream().forEach(item-> finalSb6.append(item+","));
+    new CopyOnWriteArrayList<>(SnapshotRoot.times).stream().forEach(item-> finalSb6.append(item+","));
     logger.info("account and storage-row db notFound process trans "+isPush+" "+sb.toString());
   }
 
