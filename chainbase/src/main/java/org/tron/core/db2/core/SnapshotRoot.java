@@ -54,6 +54,7 @@ public class SnapshotRoot extends AbstractSnapshot<byte[], byte[]> {
 
   @Override
   public byte[] get(byte[] key) {
+    synchronized (AccountStore.class) {
     long start = System.nanoTime();
     long time = 0;
     Boolean find = Boolean.TRUE;
@@ -69,7 +70,6 @@ public class SnapshotRoot extends AbstractSnapshot<byte[], byte[]> {
     }finally {
       time=System.nanoTime()-start;
       if(getDbName().equals("account")||getDbName().equals("storage-row")) {
-        synchronized (AccountStore.class) {
           times.add(time);
           if (!find) {
             notFoundtimes.add(time);

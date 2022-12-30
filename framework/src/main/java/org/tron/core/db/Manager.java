@@ -735,74 +735,76 @@ public class Manager {
           AccountResourceInsufficientException, DupTransactionException, TaposException,
           TooBigTransactionException, TransactionExpirationException,
           ReceiptCheckErrException, VMIllegalException, TooBigTransactionResultException {
-    long begin = System.nanoTime();
-    if(fromNet) {
-      resetDbTimes();
-    }
-    if (isShieldedTransaction(trx.getInstance()) && !Args.getInstance()
-            .isFullNodeAllowShieldedTransactionArgs()) {
+    synchronized (AccountStore.class) {
+      long begin = System.nanoTime();
+      if (fromNet) {
+        resetDbTimes();
+      }
+      if (isShieldedTransaction(trx.getInstance()) && !Args.getInstance()
+              .isFullNodeAllowShieldedTransactionArgs()) {
+        return true;
+      }
+
+      pushTransactionQueue.add(trx);
+      Metrics.gaugeInc(MetricKeys.Gauge.MANAGER_QUEUE, 1,
+              MetricLabels.Gauge.QUEUE_QUEUED);
+      try {
+        if (!trx.validateSignature(chainBaseManager.getAccountStore(),
+                chainBaseManager.getDynamicPropertiesStore())) {
+          throw new ValidateSignatureException(String.format("trans sig validate failed, id: %s",
+                  trx.getTransactionId()));
+        }
+
+        synchronized (transactionLock) {
+          while (true) {
+            try {
+              if (isBlockWaitingLock()) {
+                TimeUnit.MILLISECONDS.sleep(SLEEP_FOR_WAIT_LOCK);
+              } else {
+                break;
+              }
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              logger.debug("The wait has been interrupted.");
+            }
+          }
+          synchronized (this) {
+            if (isShieldedTransaction(trx.getInstance())
+                    && shieldedTransInPendingCounts.get() >= shieldedTransInPendingMaxCounts) {
+              return false;
+            }
+            if (!session.valid()) {
+              session.setValue(revokingStore.buildSession());
+            }
+
+            try (ISession tmpSession = revokingStore.buildSession()) {
+              processTransaction(trx, null, false);
+              trx.setTrxTrace(null);
+              pendingTransactions.add(trx);
+              // logger.info("pending trans add :"+pendingTransactions.size()+",repushSize="+rePushTransactions.size());
+              Metrics.gaugeInc(MetricKeys.Gauge.MANAGER_QUEUE, 1,
+                      MetricLabels.Gauge.QUEUE_PENDING);
+              tmpSession.merge();
+            }
+            if (isShieldedTransaction(trx.getInstance())) {
+              shieldedTransInPendingCounts.incrementAndGet();
+            }
+          }
+        }
+      } finally {
+        if (pushTransactionQueue.remove(trx)) {
+          Metrics.gaugeInc(MetricKeys.Gauge.MANAGER_QUEUE, -1,
+                  MetricLabels.Gauge.QUEUE_QUEUED);
+        }
+        if (fromNet) {
+          synchronized (AccountStore.class) {
+            logger.info("push trans into pending finish,processAllTime=" + (System.nanoTime() - begin));
+            printLogTimes(Boolean.FALSE);
+          }
+        }
+      }
       return true;
     }
-
-    pushTransactionQueue.add(trx);
-    Metrics.gaugeInc(MetricKeys.Gauge.MANAGER_QUEUE, 1,
-            MetricLabels.Gauge.QUEUE_QUEUED);
-    try {
-      if (!trx.validateSignature(chainBaseManager.getAccountStore(),
-              chainBaseManager.getDynamicPropertiesStore())) {
-        throw new ValidateSignatureException(String.format("trans sig validate failed, id: %s",
-                trx.getTransactionId()));
-      }
-
-      synchronized (transactionLock) {
-        while (true) {
-          try {
-            if (isBlockWaitingLock()) {
-              TimeUnit.MILLISECONDS.sleep(SLEEP_FOR_WAIT_LOCK);
-            } else {
-              break;
-            }
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            logger.debug("The wait has been interrupted.");
-          }
-        }
-        synchronized (this) {
-          if (isShieldedTransaction(trx.getInstance())
-                  && shieldedTransInPendingCounts.get() >= shieldedTransInPendingMaxCounts) {
-            return false;
-          }
-          if (!session.valid()) {
-            session.setValue(revokingStore.buildSession());
-          }
-
-          try (ISession tmpSession = revokingStore.buildSession()) {
-            processTransaction(trx, null, false);
-            trx.setTrxTrace(null);
-            pendingTransactions.add(trx);
-           // logger.info("pending trans add :"+pendingTransactions.size()+",repushSize="+rePushTransactions.size());
-            Metrics.gaugeInc(MetricKeys.Gauge.MANAGER_QUEUE, 1,
-                    MetricLabels.Gauge.QUEUE_PENDING);
-            tmpSession.merge();
-          }
-          if (isShieldedTransaction(trx.getInstance())) {
-            shieldedTransInPendingCounts.incrementAndGet();
-          }
-        }
-      }
-    } finally {
-      if (pushTransactionQueue.remove(trx)) {
-        Metrics.gaugeInc(MetricKeys.Gauge.MANAGER_QUEUE, -1,
-                MetricLabels.Gauge.QUEUE_QUEUED);
-      }
-      if(fromNet) {
-        synchronized (AccountStore.class) {
-          logger.info("push trans into pending finish,processAllTime=" + (System.nanoTime() - begin));
-          printLogTimes(Boolean.FALSE);
-        }
-      }
-    }
-    return true;
   }
 
   public void consumeMultiSignFee(TransactionCapsule trx, TransactionTrace trace)

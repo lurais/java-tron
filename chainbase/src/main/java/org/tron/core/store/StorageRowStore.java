@@ -28,22 +28,22 @@ public class StorageRowStore extends TronStoreWithRevoking<StorageRowCapsule> {
 
   @Override
   public StorageRowCapsule get(byte[] key) {
-    long start = System.nanoTime();
-    long time = 0;
-    boolean find = Boolean.TRUE;
-    try {
-      StorageRowCapsule row = getUnchecked(key);
-      time = System.nanoTime()-start;
-      if(row==null) find=Boolean.FALSE;
-      row.setRowKey(key);
-      return row;
-    }finally {
-      synchronized (AccountStore.class) {
-        times.add(time);
-        if (!find) {
-          notFoundtimes.add(time);
-        }
-      }
+    synchronized (AccountStore.class) {
+  long start = System.nanoTime();
+  long time = 0;
+  boolean find = Boolean.TRUE;
+  try {
+    StorageRowCapsule row = getUnchecked(key);
+    time = System.nanoTime()-start;
+    if(row==null) find=Boolean.FALSE;
+    row.setRowKey(key);
+    return row;
+  }finally {
+    times.add(time);
+    if (!find) {
+      notFoundtimes.add(time);
+    }
+  }
     }
   }
 }
