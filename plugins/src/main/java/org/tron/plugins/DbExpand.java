@@ -1,9 +1,12 @@
 package org.tron.plugins;
 
+import ch.qos.logback.core.encoder.ByteArrayUtil;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
+
+import java.io.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -20,8 +23,6 @@ import org.iq80.leveldb.DBIterator;
 import org.iq80.leveldb.WriteBatch;
 import picocli.CommandLine;
 
-import java.io.File;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -117,11 +118,110 @@ public class DbExpand implements Callable<Integer> {
             doTestGetInSecond(levelDb,levelDb,name);
         }else if(op==6){
             doExpandIter(levelDb,secondDb,name);
-        }else {
+        }else if(op==7){
+            doExportKeys(levelDb,secondDb,name);
+        }else if(op==8){
+            doTestFileGetInSecond(secondDb,name);
+        }else{
             doExpand(levelDb, secondDb, name, rate, op);
         }
         long cost = System.currentTimeMillis() - start;
         spec.commandLine().getOut().println(String.format("Expand db %s done,cost:%s seconds", name, cost / 1000.0));
+    }
+
+    private void doTestFileGetInSecond(DB secondDb, String name) {
+        File keysFile = new File(name+"keys");
+        BufferedReader reader = null;
+        String perline;
+        List<byte[]> keys = new ArrayList<>(BATCH + 30);
+        try {
+            reader = new BufferedReader(new FileReader(keysFile));
+            while ((perline = reader.readLine()) != null) {
+                byte[] origin = ByteArrayUtil.hexStringToByteArray(perline);
+                keys.add(origin);
+                if(keys.size()%50==0){
+                    keys.add(structureKey(name) ? generateStructure(name): shuffleBytes(origin));
+                }
+                if(keys.size()>=BATCH){
+                    statGetPerformance(secondDb,name,keys);
+                    keys.clear();
+                }
+            }
+        }catch (IOException e){
+            spec.commandLine().getErr().println(String.format("Open file %s error %s."
+                    , name+"keys", e.getStackTrace()));
+        }finally {
+            try {
+                if(reader!=null) {
+                    reader.close();
+                }
+                secondDb.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private void doExportKeys(DB levelDb, DB secondDb, String name){
+        long allStat = 0;
+        File keysFile = new File(name+"keys");
+        BufferedWriter out = null;
+        try {
+            out = new BufferedWriter(new FileWriter(name + "keys"));
+        }catch (IOException e){
+            spec.commandLine().getErr().println(String.format("Open file %s error %s."
+                    , name+"keys", e.getStackTrace()));
+        }
+        List<byte[]> keys = new ArrayList<>(BATCH);
+        try (DBIterator levelIterator = levelDb.iterator(
+                new org.iq80.leveldb.ReadOptions().fillCache(true))) {
+            JniDBFactory.pushMemoryPool(2048 * 2048);
+            levelIterator.seekToFirst();
+
+            while (levelIterator.hasNext()) {
+                Map.Entry<byte[], byte[]> entry = levelIterator.next();
+                if(r.nextInt(1000) < 10){
+                    keys.add(entry.getKey());
+                }
+                if (keys.size() >= BATCH) {
+                    try {
+                        writeToFile(out,keys);
+                        allStat+=keys.size();
+                        keys.clear();
+                    } catch (Exception e) {
+                        spec.commandLine().getErr().println(String.format("Batch add keys %s error %s."
+                                , name, e.getStackTrace()));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            spec.commandLine().getErr().println(String.format("Expand %s error %s."
+                    , name, e.getStackTrace()));
+        } finally {
+            try {
+                levelDb.close();
+                if(secondDb!=null) {
+                    secondDb.close();
+                }
+                out.close();
+                JniDBFactory.popMemoryPool();
+            } catch (Exception e1) {
+                spec.commandLine().getErr().println(String.format("Close %s error %s."
+                        , name, e1.getStackTrace()));
+            }
+            spec.commandLine().getOut().println(String.format("Export keys %s done,expand count:%s", name, allStat));
+        }
+    }
+
+    private void writeToFile(BufferedWriter bufferedWriter, List<byte[]> keys) throws IOException {
+        if(keys.size()<1){
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        for(byte[] key:keys){
+            sb.append(ByteArrayUtil.toHexString(key)+"\r\n");
+        }
+        bufferedWriter.write(sb.toString());
     }
 
     private void doExpandIter(DB levelDb, DB secondDb, String name) {
@@ -250,12 +350,18 @@ public class DbExpand implements Callable<Integer> {
             return;
         }
         StringBuilder sb = new StringBuilder();
+        StringBuilder sb2 = new StringBuilder();
         for(byte[] key:statKeys){
             long begin = System.nanoTime();
             byte[] value = secondDb.get(key);
-            sb.append((System.nanoTime()-begin)/1000000.0+",");
+            if(value==null){
+                sb2.append((System.nanoTime() - begin) / 1000000.0 + ",");
+            }else {
+                sb.append((System.nanoTime() - begin) / 1000000.0 + ",");
+            }
         }
         spec.commandLine().getOut().println(name + " statGet :"+sb.toString());
+        spec.commandLine().getOut().println(name + " statGet notFound:"+sb2.toString());
     }
 
     private void mergeDbReverse(DB originDb, DB targetDb) {
