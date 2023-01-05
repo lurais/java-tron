@@ -4,12 +4,14 @@ import static com.google.common.base.Preconditions.checkState;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.iq80.leveldb.impl.Iq80DBFactory.factory;
 
+import ch.qos.logback.core.encoder.ByteArrayUtil;
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -22,10 +24,12 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.Random;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -72,6 +76,8 @@ public class ArchiveManifest implements Callable<Boolean> {
   private final String name;
   private final Options options;
   private final long startTime;
+  Random r = new Random();
+
 
 
   private static final int CPUS  = Runtime.getRuntime().availableProcessors();
@@ -204,9 +210,8 @@ public class ArchiveManifest implements Callable<Boolean> {
       Level0 level0 = (Level0) getAttr("org.iq80.leveldb.impl.Version","level0",versions.getCurrent());
       List<Level> levels = (List<Level>) getAttr("org.iq80.leveldb.impl.Version","levels",versions.getCurrent());
 
-      Map<Integer,Long> numMap = getLevelCount(database, thirdDb,levels,level0,versions.getTableCache());
+      Map<Integer,Long> numMap = keyToFiles(levels,level0,versions.getTableCache());
       StringBuilder sb2 = new StringBuilder();
-      numMap.entrySet().stream().forEach(entry->sb2.append(",level:"+entry.getKey()+",count:"+entry.getValue()));
       logger.info("travel sst final:"+sb2.toString());
     } catch (ClassNotFoundException e) {
       e.printStackTrace();
@@ -217,6 +222,80 @@ public class ArchiveManifest implements Callable<Boolean> {
     }
     database.close();
     secondDb.close();
+  }
+
+  private Map<Integer, Long> keyToFiles(List<Level> levels, Level0 level0,
+                                        TableCache tableCache)
+      throws IllegalAccessException, NoSuchFieldException, ClassNotFoundException, IOException {
+    Map<Integer, BufferedWriter> levelToFile =null;
+    try {
+      levelToFile = initLevelFile(name);
+      for (FileMetaData fileMetaData : level0.getFiles()) {
+        List<byte[]> keys = doFetchLevel0Keys(fileMetaData, level0, tableCache);
+        writeToFile(keys, levelToFile.get(0));
+      }
+      for (Level level : levels) {
+        for (FileMetaData fileMetaData : level.getFiles()) {
+          List<byte[]> keys = doFetchKeys(fileMetaData, level, tableCache);
+          keys = randomPick(keys, level.getLevelNumber());
+          writeToFile(keys, levelToFile.get(level.getLevelNumber()));
+        }
+      }
+      return null;
+    }catch (Exception e){
+      logger.info("key write error",e);
+    }finally {
+      if(levelToFile!=null){
+        for(Map.Entry entry:levelToFile.entrySet()){
+          BufferedReader bufferedReader = (BufferedReader) entry.getValue();
+          if(bufferedReader!=null){
+            bufferedReader.close();
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  private List<byte[]> randomPick(List<byte[]> keys, int levelNumber) {
+    List<byte[]> res = new LinkedList<>();
+    for(byte[] key :keys){
+      if(levelNumber<=2){
+        if(r.nextInt(100) < 10) {
+          res.add(key);
+          continue;
+        }
+      }else {
+        if (r.nextInt(1000) < 10) {
+          res.add(key);
+        }
+      }
+    }
+    return res;
+  }
+
+  private void writeToFile(List<byte[]> keys, BufferedWriter bufferedWriter) throws IOException {
+    if(keys.size()<1){
+      return;
+    }
+    StringBuilder sb = new StringBuilder();
+    for(byte[] key:keys){
+      sb.append(ByteArrayUtil.toHexString(key)+"\r\n");
+    }
+    bufferedWriter.write(sb.toString());
+  }
+
+  private Map<Integer, BufferedWriter> initLevelFile(String name) {
+    try {
+      Map<Integer,BufferedWriter> fileWriterMap = new HashMap<>();
+      for(int i=0;i<=5;i++){
+        File file = new File(name+"level"+i);
+        fileWriterMap.put(i,new BufferedWriter(new FileWriter(name+"level"+i)));
+      }
+      return fileWriterMap;
+    } catch (Exception e){
+      throw new RuntimeException(e);
+    }
   }
 
   public static Object getAttr(String className,String fieldName,Object target) throws ClassNotFoundException, NoSuchFieldException, IllegalAccessException {
