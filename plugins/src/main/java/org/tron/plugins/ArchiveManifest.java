@@ -71,8 +71,6 @@ public class ArchiveManifest implements Callable<Boolean> {
   private static final String LEVELDB = "LEVELDB";
 
   private final Path srcDbPath;
-  private final Path secondSrcDbPath;
-  private final Path thirdSrcDbPath;
   private final String name;
   private final Options options;
   private final long startTime;
@@ -85,8 +83,6 @@ public class ArchiveManifest implements Callable<Boolean> {
   public ArchiveManifest(String src, String name, int maxManifestSize, int maxBatchSize) {
     this.name = name;
     this.srcDbPath = Paths.get(src, name);
-    this.secondSrcDbPath = Paths.get(src,name+"_second");
-    this.thirdSrcDbPath = Paths.get(src,name+"_third");
     this.startTime = System.currentTimeMillis();
     this.options = newDefaultLevelDbOptions();
     this.options.maxManifestSize(maxManifestSize);
@@ -197,9 +193,9 @@ public class ArchiveManifest implements Callable<Boolean> {
         userComparator = new BytewiseComparator();
       }
       internalKeyComparator = new InternalKeyComparator(userComparator);
-      TableCache tableCache = new TableCache(secondSrcDbPath.toFile(), tableCacheSize,
+      TableCache tableCache = new TableCache(srcDbPath.toFile(), tableCacheSize,
           new InternalUserComparator(internalKeyComparator), options.verifyChecksums());
-      VersionSet versions = new VersionSet(secondSrcDbPath.toFile(), tableCache, options, internalKeyComparator);
+      VersionSet versions = new VersionSet(srcDbPath.toFile(), tableCache, options, internalKeyComparator);
       // load  (and recover) current version
       versions.recover();
 
