@@ -5,12 +5,8 @@ import static org.fusesource.leveldbjni.JniDBFactory.factory;
 import ch.qos.logback.core.encoder.ByteArrayUtil;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+
+import java.io.*;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -131,13 +127,24 @@ public class DbExpand implements Callable<Integer> {
     }
 
     private void doTestFileGetInSecond(DB secondDb, String name) {
+        try{
         File current = new File(".");
         for(File file:getFileAll(current,new ArrayList<>(),"level")){
             doTestFileGet(secondDb,name,file);
         }
+        }catch (IOException e){
+            spec.commandLine().getErr().println(String.format("Open file %s error %s."
+                    , name+"keys", e.getStackTrace()));
+        }finally {
+            try {
+                secondDb.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
-    private void doTestFileGet(DB secondDb, String name,File keysFile){
+    private void doTestFileGet(DB secondDb, String name,File keysFile) throws IOException {
         BufferedReader reader = null;
         String perline;
         List<byte[]> keys = new ArrayList<>(BATCH + 30);
@@ -146,30 +153,23 @@ public class DbExpand implements Callable<Integer> {
             while ((perline = reader.readLine()) != null) {
                 byte[] origin = ByteArrayUtil.hexStringToByteArray(perline);
                 keys.add(origin);
-                if(keys.size()%50==0){
-                    keys.add(structureKey(name) ? generateStructure(name): shuffleBytes(origin));
+                if (keys.size() % 50 == 0) {
+                    keys.add(structureKey(name) ? generateStructure(name) : shuffleBytes(origin));
                 }
-                if(keys.size()>=BATCH){
+                if (keys.size() >= BATCH) {
                     statGetPerformance(secondDb, keysFile.getName(), keys);
                     keys.clear();
                 }
             }
-            if(keys.size()>0){
+            if (keys.size() > 0) {
                 statGetPerformance(secondDb, keysFile.getName(), keys);
                 keys.clear();
             }
-        }catch (IOException e){
-            spec.commandLine().getErr().println(String.format("Open file %s error %s."
-                , name+"keys", e.getStackTrace()));
-        }finally {
-            try {
-                if(reader!=null) {
-                    reader.close();
-                }
-                secondDb.close();
-            } catch (IOException e) {
-                e.printStackTrace();
+        }catch (Exception e){
+            if(reader!=null){
+                reader.close();
             }
+            throw e;
         }
     }
 
