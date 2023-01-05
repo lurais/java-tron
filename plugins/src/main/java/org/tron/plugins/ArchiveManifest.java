@@ -183,8 +183,6 @@ public class ArchiveManifest implements Callable<Boolean> {
 
   public void open() throws IOException {
     DB database = factory.open(this.srcDbPath.toFile(), this.options);
-    DB secondDb = factory.open(this.secondSrcDbPath.toFile(), this.options);
-    DB thirdDb = factory.open(this.thirdSrcDbPath.toFile(), this.options);
     try {
       Options options = this.options;
 
@@ -221,7 +219,6 @@ public class ArchiveManifest implements Callable<Boolean> {
       e.printStackTrace();
     }
     database.close();
-    secondDb.close();
   }
 
   private Map<Integer, Long> keyToFiles(List<Level> levels, Level0 level0,
