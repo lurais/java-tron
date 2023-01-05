@@ -240,9 +240,9 @@ public class ArchiveManifest implements Callable<Boolean> {
     }finally {
       if(levelToFile!=null){
         for(Map.Entry entry:levelToFile.entrySet()){
-          BufferedReader bufferedReader = (BufferedReader) entry.getValue();
-          if(bufferedReader!=null){
-            bufferedReader.close();
+          BufferedWriter bufferedWriter = (BufferedWriter) entry.getValue();
+          if(bufferedWriter!=null){
+            bufferedWriter.close();
           }
         }
       }
@@ -254,7 +254,7 @@ public class ArchiveManifest implements Callable<Boolean> {
     List<byte[]> res = new LinkedList<>();
     for(byte[] key :keys){
       if(levelNumber<=2){
-        if(r.nextInt(100) < 10) {
+        if(r.nextInt(100) < 60) {
           res.add(key);
           continue;
         }
