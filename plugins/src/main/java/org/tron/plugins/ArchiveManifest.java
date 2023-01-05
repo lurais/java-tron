@@ -254,7 +254,7 @@ public class ArchiveManifest implements Callable<Boolean> {
     List<byte[]> res = new LinkedList<>();
     for(byte[] key :keys){
       if(levelNumber<=2){
-        if(r.nextInt(100) < 60) {
+        if(r.nextInt(100) < 90) {
           res.add(key);
           continue;
         }
