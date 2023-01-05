@@ -1,33 +1,34 @@
 package org.tron.plugins;
 
-import ch.qos.logback.core.encoder.ByteArrayUtil;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.typesafe.config.Config;
-import com.typesafe.config.ConfigFactory;
-
-import java.io.*;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import me.tongfei.progressbar.ProgressBar;
-import org.apache.commons.lang3.StringUtils;
-
 import static org.fusesource.leveldbjni.JniDBFactory.factory;
 
+import ch.qos.logback.core.encoder.ByteArrayUtil;
+import com.typesafe.config.Config;
+import com.typesafe.config.ConfigFactory;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.fusesource.leveldbjni.JniDBFactory;
 import org.iq80.leveldb.CompressionType;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBIterator;
 import org.iq80.leveldb.WriteBatch;
 import picocli.CommandLine;
-
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.*;
-import java.util.concurrent.Callable;
-import java.util.stream.Collectors;
 
 
 @CommandLine.Command(name = "ep", aliases = "expand",
@@ -130,7 +131,13 @@ public class DbExpand implements Callable<Integer> {
     }
 
     private void doTestFileGetInSecond(DB secondDb, String name) {
-        File keysFile = new File(name+"keys");
+        File current = new File(".");
+        for(File file:getFileAll(current,new ArrayList<>(),"level")){
+            doTestFileGet(secondDb,name,file);
+        }
+    }
+
+    private void doTestFileGet(DB secondDb, String name,File keysFile){
         BufferedReader reader = null;
         String perline;
         List<byte[]> keys = new ArrayList<>(BATCH + 30);
@@ -143,13 +150,17 @@ public class DbExpand implements Callable<Integer> {
                     keys.add(structureKey(name) ? generateStructure(name): shuffleBytes(origin));
                 }
                 if(keys.size()>=BATCH){
-                    statGetPerformance(secondDb,name,keys);
+                    statGetPerformance(secondDb, keysFile.getName(), keys);
                     keys.clear();
                 }
             }
+            if(keys.size()>0){
+                statGetPerformance(secondDb, keysFile.getName(), keys);
+                keys.clear();
+            }
         }catch (IOException e){
             spec.commandLine().getErr().println(String.format("Open file %s error %s."
-                    , name+"keys", e.getStackTrace()));
+                , name+"keys", e.getStackTrace()));
         }finally {
             try {
                 if(reader!=null) {
@@ -160,6 +171,20 @@ public class DbExpand implements Callable<Integer> {
                 e.printStackTrace();
             }
         }
+    }
+
+    public static ArrayList<File> getFileAll(File file,ArrayList<File> fileList,String pos) {
+        File[] files = file.listFiles();
+        for (int i = 0; i < files.length; i++) {
+            if (files[i].isDirectory()) {
+                continue;
+            } else {
+                if(files[i].getName().contains(pos)) {
+                    fileList.add(files[i]);
+                }
+            }
+        }
+        return fileList;
     }
 
     private void doExportKeys(DB levelDb, DB secondDb, String name){
