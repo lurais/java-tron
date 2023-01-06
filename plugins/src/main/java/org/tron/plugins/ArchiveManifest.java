@@ -253,15 +253,8 @@ public class ArchiveManifest implements Callable<Boolean> {
   private List<byte[]> randomPick(List<byte[]> keys, int levelNumber) {
     List<byte[]> res = new LinkedList<>();
     for(byte[] key :keys){
-      if(levelNumber<=2){
-        if(r.nextInt(100) < 90) {
-          res.add(key);
-          continue;
-        }
-      }else {
-        if (r.nextInt(1000) < 10) {
-          res.add(key);
-        }
+      if (r.nextInt(1000) < 10) {
+        res.add(key);
       }
     }
     return res;
