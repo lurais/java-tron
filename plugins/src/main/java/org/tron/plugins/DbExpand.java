@@ -380,9 +380,9 @@ public class DbExpand implements Callable<Integer> {
             long begin = System.nanoTime();
             byte[] value = secondDb.get(key);
             if(value==null){
-                sb2.append((System.nanoTime() - begin) / 1000000.0 + ",");
+                sb2.append((System.nanoTime() - begin) + ",");
             }else {
-                sb.append((System.nanoTime() - begin) / 1000000.0 + ",");
+                sb.append((System.nanoTime() - begin) + ",");
             }
         }
         spec.commandLine().getOut().println(name + " statGet :"+sb.toString());
