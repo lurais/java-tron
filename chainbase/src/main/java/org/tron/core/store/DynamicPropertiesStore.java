@@ -187,6 +187,24 @@ public class DynamicPropertiesStore extends TronStoreWithRevoking<BytesCapsule> 
   private static final byte[] ALLOW_HIGHER_LIMIT_FOR_MAX_CPU_TIME_OF_ONE_TX =
       "ALLOW_HIGHER_LIMIT_FOR_MAX_CPU_TIME_OF_ONE_TX".getBytes();
 
+  private static final byte[] ALLOW_NEW_REWARD = "ALLOW_NEW_REWARD".getBytes();
+  private static final byte[] MEMO_FEE = "MEMO_FEE".getBytes();
+  private static final byte[] MEMO_FEE_HISTORY = "MEMO_FEE_HISTORY".getBytes();
+  private static final byte[] ALLOW_DELEGATE_OPTIMIZATION =
+      "ALLOW_DELEGATE_OPTIMIZATION".getBytes();
+  private static final byte[] ALLOW_DYNAMIC_ENERGY =
+      "ALLOW_DYNAMIC_ENERGY".getBytes();
+  private static final byte[] DYNAMIC_ENERGY_THRESHOLD =
+      "DYNAMIC_ENERGY_THRESHOLD".getBytes();
+  private static final byte[] DYNAMIC_ENERGY_INCREASE_FACTOR =
+      "DYNAMIC_ENERGY_INCREASE_FACTOR".getBytes();
+  private static final byte[] DYNAMIC_ENERGY_MAX_FACTOR =
+      "DYNAMIC_ENERGY_MAX_FACTOR".getBytes();
+
+  private static final byte[] UNFREEZE_DELAY_DAYS = "UNFREEZE_DELAY_DAYS".getBytes();
+
+  private static final byte[] ALLOW_OPTIMIZED_RETURN_VALUE_OF_CHAIN_ID =
+      "ALLOW_OPTIMIZED_RETURN_VALUE_OF_CHAIN_ID".getBytes();
 
   @Autowired
   private DynamicPropertiesStore(@Value("properties") String dbName) {
@@ -846,6 +864,83 @@ public class DynamicPropertiesStore extends TronStoreWithRevoking<BytesCapsule> 
       this.saveAllowHigherLimitForMaxCpuTimeOfOneTx(
           CommonParameter.getInstance().getAllowHigherLimitForMaxCpuTimeOfOneTx());
     }
+
+    try {
+      this.getNewRewardAlgorithmEffectiveCycle();
+    } catch (IllegalArgumentException e) {
+      if (CommonParameter.getInstance().getAllowNewRewardAlgorithm() == 1) {
+        this.put(NEW_REWARD_ALGORITHM_EFFECTIVE_CYCLE,
+            new BytesCapsule(ByteArray.fromLong(getCurrentCycleNumber())));
+      } else {
+        this.put(NEW_REWARD_ALGORITHM_EFFECTIVE_CYCLE,
+            new BytesCapsule(ByteArray.fromLong(Long.MAX_VALUE)));
+      }
+    }
+
+    try {
+      this.getAllowNewReward();
+    } catch (IllegalArgumentException e) {
+      this.saveAllowNewReward(CommonParameter.getInstance().getAllowNewReward());
+      if (CommonParameter.getInstance().getAllowNewReward() == 1) {
+        this.put(NEW_REWARD_ALGORITHM_EFFECTIVE_CYCLE,
+                new BytesCapsule(ByteArray.fromLong(getCurrentCycleNumber())));
+      }
+    }
+
+    try {
+      this.getMemoFee();
+    } catch (IllegalArgumentException e) {
+      long memoFee = CommonParameter.getInstance().getMemoFee();
+      this.saveMemoFee(memoFee);
+      this.saveMemoFeeHistory("0:" + memoFee);
+    }
+
+    try {
+      this.getAllowDelegateOptimization();
+    } catch (IllegalArgumentException e) {
+      this.saveAllowDelegateOptimization(
+          CommonParameter.getInstance().getAllowDelegateOptimization());
+    }
+
+    try {
+      this.getUnfreezeDelayDays();
+    } catch (IllegalArgumentException e) {
+      this.saveUnfreezeDelayDays(
+          CommonParameter.getInstance().getUnfreezeDelayDays()
+      );
+    }
+
+    try {
+      this.getAllowOptimizedReturnValueOfChainId();
+    } catch (IllegalArgumentException e) {
+      this.saveAllowOptimizedReturnValueOfChainId(
+          CommonParameter.getInstance().getAllowOptimizedReturnValueOfChainId()
+      );
+    }
+
+    try {
+      this.getAllowDynamicEnergy();
+    } catch (IllegalArgumentException e) {
+      this.saveAllowDynamicEnergy(CommonParameter.getInstance().getAllowDynamicEnergy());
+    }
+
+    try {
+      this.getDynamicEnergyThreshold();
+    } catch (IllegalArgumentException e) {
+      this.saveDynamicEnergyThreshold(CommonParameter.getInstance().getDynamicEnergyThreshold());
+    }
+
+    try {
+      this.getDynamicEnergyIncreaseFactor();
+    } catch (IllegalArgumentException e) {
+      this.saveDynamicEnergyIncreaseFactor(CommonParameter.getInstance().getDynamicEnergyIncreaseFactor());
+    }
+
+    try {
+      this.getDynamicEnergyMaxFactor();
+    } catch (IllegalArgumentException e) {
+      this.saveDynamicEnergyMaxFactor(CommonParameter.getInstance().getDynamicEnergyMaxFactor());
+    }
   }
 
   public String intArrayToString(int[] a) {
@@ -905,7 +1000,7 @@ public class DynamicPropertiesStore extends TronStoreWithRevoking<BytesCapsule> 
   }
 
   public void saveBlockFilledSlotsIndex(int blockFilledSlotsIndex) {
-    logger.debug("blockFilledSlotsIndex:" + blockFilledSlotsIndex);
+    logger.debug("BlockFilledSlotsIndex: {}.", blockFilledSlotsIndex);
     this.put(BLOCK_FILLED_SLOTS_INDEX,
         new BytesCapsule(ByteArray.fromInt(blockFilledSlotsIndex)));
   }
@@ -1936,7 +2031,7 @@ public class DynamicPropertiesStore extends TronStoreWithRevoking<BytesCapsule> 
   }
 
   public void saveBlockFilledSlots(int[] blockFilledSlots) {
-    logger.debug("blockFilledSlots:" + intArrayToString(blockFilledSlots));
+    logger.debug("BlockFilledSlots: {}.", intArrayToString(blockFilledSlots));
     this.put(BLOCK_FILLED_SLOTS,
         new BytesCapsule(ByteArray.fromString(intArrayToString(blockFilledSlots))));
   }
@@ -2034,7 +2129,7 @@ public class DynamicPropertiesStore extends TronStoreWithRevoking<BytesCapsule> 
           .orElseThrow(
               () -> new IllegalArgumentException("not found latest block header number"));
     } catch (ItemNotFoundException | BadItemException e) {
-      logger.error("{}", e);
+      logger.error("Get header from DB, {}.", e.getMessage());
     }
     return -1;
   }
@@ -2061,7 +2156,7 @@ public class DynamicPropertiesStore extends TronStoreWithRevoking<BytesCapsule> 
    * save timestamp of creating global latest block.
    */
   public void saveLatestBlockHeaderTimestamp(long t) {
-    logger.info("update latest block header timestamp = {}", t);
+    logger.info("Update latest block header timestamp = {}.", t);
     this.put(LATEST_BLOCK_HEADER_TIMESTAMP, new BytesCapsule(ByteArray.fromLong(t)));
   }
 
@@ -2069,7 +2164,7 @@ public class DynamicPropertiesStore extends TronStoreWithRevoking<BytesCapsule> 
    * save number of global latest block.
    */
   public void saveLatestBlockHeaderNumber(long n) {
-    logger.info("update latest block header number = {}", n);
+    logger.info("Update latest block header number = {}.", n);
     this.put(LATEST_BLOCK_HEADER_NUMBER, new BytesCapsule(ByteArray.fromLong(n)));
   }
 
@@ -2077,12 +2172,12 @@ public class DynamicPropertiesStore extends TronStoreWithRevoking<BytesCapsule> 
    * save id of global latest block.
    */
   public void saveLatestBlockHeaderHash(ByteString h) {
-    logger.info("update latest block header id = {}", ByteArray.toHexString(h.toByteArray()));
+    logger.info("Update latest block header id = {}.", ByteArray.toHexString(h.toByteArray()));
     this.put(LATEST_BLOCK_HEADER_HASH, new BytesCapsule(h.toByteArray()));
   }
 
   public void saveStateFlag(int n) {
-    logger.info("update state flag = {}", n);
+    logger.info("Update state flag = {}.", n);
     this.put(STATE_FLAG, new BytesCapsule(ByteArray.fromInt(n)));
   }
 
@@ -2112,8 +2207,8 @@ public class DynamicPropertiesStore extends TronStoreWithRevoking<BytesCapsule> 
     saveNextMaintenanceTime(nextMaintenanceTime);
 
     logger.info(
-        "do update nextMaintenanceTime,currentMaintenanceTime:{}, blockTime:{},"
-            + "nextMaintenanceTime:{}",
+        "Do update nextMaintenanceTime, currentMaintenanceTime: {}, blockTime: {}, "
+            + "nextMaintenanceTime: {}.",
         new DateTime(currentMaintenanceTime), new DateTime(blockTime),
         new DateTime(nextMaintenanceTime)
     );
@@ -2123,6 +2218,9 @@ public class DynamicPropertiesStore extends TronStoreWithRevoking<BytesCapsule> 
   public void addTotalNetWeight(long amount) {
     long totalNetWeight = getTotalNetWeight();
     totalNetWeight += amount;
+    if (allowNewReward()) {
+      totalNetWeight = Math.max(0, totalNetWeight);
+    }
     saveTotalNetWeight(totalNetWeight);
   }
 
@@ -2130,6 +2228,9 @@ public class DynamicPropertiesStore extends TronStoreWithRevoking<BytesCapsule> 
   public void addTotalEnergyWeight(long amount) {
     long totalEnergyWeight = getTotalEnergyWeight();
     totalEnergyWeight += amount;
+    if (allowNewReward()) {
+      totalEnergyWeight = Math.max(0, totalEnergyWeight);
+    }
     saveTotalEnergyWeight(totalEnergyWeight);
   }
 
@@ -2137,6 +2238,9 @@ public class DynamicPropertiesStore extends TronStoreWithRevoking<BytesCapsule> 
   public void addTotalTronPowerWeight(long amount) {
     long totalWeight = getTotalTronPowerWeight();
     totalWeight += amount;
+    if (allowNewReward()) {
+      totalWeight = Math.max(0, totalWeight);
+    }
     saveTotalTronPowerWeight(totalWeight);
   }
 
@@ -2190,7 +2294,7 @@ public class DynamicPropertiesStore extends TronStoreWithRevoking<BytesCapsule> 
    * save allow protobuf  number.
    */
   public void saveAllowProtoFilterNum(long num) {
-    logger.info("update allow protobuf number = {}", num);
+    logger.info("Update allow protobuf number = {}.", num);
     this.put(ALLOW_PROTO_FILTER_NUM, new BytesCapsule(ByteArray.fromLong(num)));
   }
 
@@ -2383,7 +2487,7 @@ public class DynamicPropertiesStore extends TronStoreWithRevoking<BytesCapsule> 
   }
 
   public boolean useNewRewardAlgorithm() {
-    return getAllowTvmVote() == 1;
+    return getNewRewardAlgorithmEffectiveCycle() != Long.MAX_VALUE;
   }
 
   public void saveNewRewardAlgorithmEffectiveCycle() {
@@ -2398,7 +2502,8 @@ public class DynamicPropertiesStore extends TronStoreWithRevoking<BytesCapsule> 
     return Optional.ofNullable(getUnchecked(NEW_REWARD_ALGORITHM_EFFECTIVE_CYCLE))
         .map(BytesCapsule::getData)
         .map(ByteArray::toLong)
-        .orElse(Long.MAX_VALUE);
+        .orElseThrow(
+            () -> new IllegalArgumentException("not found NEW_REWARD_ALGORITHM_EFFECTIVE_CYCLE"));
   }
 
   public long getAllowAccountAssetOptimizationFromRoot() {
@@ -2510,6 +2615,140 @@ public class DynamicPropertiesStore extends TronStoreWithRevoking<BytesCapsule> 
   public long getAllowHigherLimitForMaxCpuTimeOfOneTx() {
     String msg = "not found ALLOW_HIGHER_LIMIT_FOR_MAX_CPU_TIME_OF_ONE_TX";
     return Optional.ofNullable(getUnchecked(ALLOW_HIGHER_LIMIT_FOR_MAX_CPU_TIME_OF_ONE_TX))
+        .map(BytesCapsule::getData)
+        .map(ByteArray::toLong)
+        .orElseThrow(
+            () -> new IllegalArgumentException(msg));
+  }
+
+  public long getMemoFee() {
+    return Optional.ofNullable(getUnchecked(MEMO_FEE))
+        .map(BytesCapsule::getData)
+        .map(ByteArray::toLong)
+        .orElseThrow(() -> new IllegalArgumentException("not found MEMO_FEE"));
+  }
+
+  public void saveMemoFee(long value) {
+    this.put(MEMO_FEE, new BytesCapsule(ByteArray.fromLong(value)));
+  }
+
+  public String getMemoFeeHistory() {
+    return Optional.ofNullable(getUnchecked(MEMO_FEE_HISTORY))
+        .map(BytesCapsule::getData)
+        .map(ByteArray::toStr)
+        .orElseThrow(() -> new IllegalArgumentException("not found MEMO_FEE_HISTORY"));
+  }
+
+  public void saveMemoFeeHistory(String value) {
+    this.put(MEMO_FEE_HISTORY, new BytesCapsule(ByteArray.fromString(value)));
+  }
+
+  public long getAllowNewReward() {
+    return Optional.ofNullable(getUnchecked(ALLOW_NEW_REWARD))
+            .map(BytesCapsule::getData)
+            .map(ByteArray::toLong)
+            .orElseThrow(() -> new IllegalArgumentException("not found AllowNewReward"));
+  }
+
+  public void saveAllowNewReward(long newReward) {
+    this.put(ALLOW_NEW_REWARD, new BytesCapsule(ByteArray.fromLong(newReward)));
+  }
+
+  public long getAllowDelegateOptimization() {
+    return Optional.ofNullable(getUnchecked(ALLOW_DELEGATE_OPTIMIZATION))
+        .map(BytesCapsule::getData)
+        .map(ByteArray::toLong)
+        .orElseThrow(
+            () -> new IllegalArgumentException("not found ALLOW_DELEGATE_OPTIMIZATION"));
+  }
+
+  public boolean supportAllowDelegateOptimization() {
+    return getAllowDelegateOptimization() == 1L;
+  }
+
+  public void saveAllowDelegateOptimization(long value) {
+    this.put(ALLOW_DELEGATE_OPTIMIZATION, new BytesCapsule(ByteArray.fromLong(value)));
+  }
+
+  public long getAllowDynamicEnergy() {
+    return Optional.ofNullable(getUnchecked(ALLOW_DYNAMIC_ENERGY))
+        .map(BytesCapsule::getData)
+        .map(ByteArray::toLong)
+        .orElseThrow(
+            () -> new IllegalArgumentException("not found ALLOW_DYNAMIC_ENERGY"));
+  }
+
+  public boolean supportAllowDynamicEnergy() {
+    return getAllowDynamicEnergy() == 1L;
+  }
+
+  public void saveAllowDynamicEnergy(long value) {
+    this.put(ALLOW_DYNAMIC_ENERGY, new BytesCapsule(ByteArray.fromLong(value)));
+  }
+
+  public long getDynamicEnergyThreshold() {
+    return Optional.ofNullable(getUnchecked(DYNAMIC_ENERGY_THRESHOLD))
+        .map(BytesCapsule::getData)
+        .map(ByteArray::toLong)
+        .orElseThrow(
+            () -> new IllegalArgumentException("not found DYNAMIC_ENERGY_THRESHOLD"));
+  }
+
+  public void saveDynamicEnergyThreshold(long value) {
+    this.put(DYNAMIC_ENERGY_THRESHOLD, new BytesCapsule(ByteArray.fromLong(value)));
+  }
+
+  public long getDynamicEnergyIncreaseFactor() {
+    return Optional.ofNullable(getUnchecked(DYNAMIC_ENERGY_INCREASE_FACTOR))
+        .map(BytesCapsule::getData)
+        .map(ByteArray::toLong)
+        .orElseThrow(
+            () -> new IllegalArgumentException("not found DYNAMIC_ENERGY_INCREASE_FACTOR"));
+  }
+
+  public void saveDynamicEnergyIncreaseFactor(long value) {
+    this.put(DYNAMIC_ENERGY_INCREASE_FACTOR, new BytesCapsule(ByteArray.fromLong(value)));
+  }
+
+  public long getDynamicEnergyMaxFactor() {
+    return Optional.ofNullable(getUnchecked(DYNAMIC_ENERGY_MAX_FACTOR))
+        .map(BytesCapsule::getData)
+        .map(ByteArray::toLong)
+        .orElseThrow(
+            () -> new IllegalArgumentException("not found DYNAMIC_ENERGY_MAX_FACTOR"));
+  }
+
+  public void saveDynamicEnergyMaxFactor(long value) {
+    this.put(DYNAMIC_ENERGY_MAX_FACTOR, new BytesCapsule(ByteArray.fromLong(value)));
+  }
+
+  public boolean allowNewReward() {
+    return getAllowNewReward() == 1;
+  }
+
+  public long getUnfreezeDelayDays() {
+    return Optional.ofNullable(getUnchecked(UNFREEZE_DELAY_DAYS))
+            .map(BytesCapsule::getData)
+            .map(ByteArray::toLong)
+            .orElseThrow(() -> new IllegalArgumentException("not found UNFREEZE_DELAY_DAYS"));
+  }
+
+  public boolean supportUnfreezeDelay() {
+    return getUnfreezeDelayDays() > 0;
+  }
+
+  public void saveUnfreezeDelayDays(long value) {
+    this.put(UNFREEZE_DELAY_DAYS, new BytesCapsule(ByteArray.fromLong(value)));
+  }
+
+  public void saveAllowOptimizedReturnValueOfChainId(long value) {
+    this.put(ALLOW_OPTIMIZED_RETURN_VALUE_OF_CHAIN_ID,
+        new BytesCapsule(ByteArray.fromLong(value)));
+  }
+
+  public long getAllowOptimizedReturnValueOfChainId() {
+    String msg = "not found ALLOW_OPTIMIZED_RETURN_VALUE_OF_CHAIN_ID";
+    return Optional.ofNullable(getUnchecked(ALLOW_OPTIMIZED_RETURN_VALUE_OF_CHAIN_ID))
         .map(BytesCapsule::getData)
         .map(ByteArray::toLong)
         .orElseThrow(
