@@ -24,6 +24,12 @@ import org.iq80.leveldb.CompressionType;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBIterator;
 import org.iq80.leveldb.WriteBatch;
+import org.rocksdb.BlockBasedTableConfig;
+import org.rocksdb.BloomFilter;
+import org.rocksdb.Options;
+import org.rocksdb.ReadOptions;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
 import picocli.CommandLine;
 
 
@@ -97,6 +103,23 @@ public class DbExpand implements Callable<Integer> {
         String dbPath = config.hasPath(DB_DIRECTORY_CONFIG_KEY)
                 ? config.getString(DB_DIRECTORY_CONFIG_KEY) : DEFAULT_DB_DIRECTORY;
         long start = System.currentTimeMillis();
+        if(op==20){
+            try(DB leveldb = openLevelDb(Paths.get(database.toString(),dbPath,c.getString(PATH_CONFIG_KEY)));
+                DB leveldbSecond = openLevelDb(Paths.get(database.toString(),dbPath,c.getString(PATH_CONFIG_KEY)+"_second"));
+                DB leveldbThird = openLevelDb(Paths.get(database.toString(),dbPath,c.getString(PATH_CONFIG_KEY)+"_third"));
+                RocksDB rdb = initDB(Paths.get(database.toString(),dbPath,c.getString(PATH_CONFIG_KEY)+"_rdb"));
+                RocksDB rdbSecond = initDB(Paths.get(database.toString(),dbPath,c.getString(NAME_CONFIG_KEY)+"_rdb_second"));){
+                migrate(leveldb,rdb,null);
+                migrate(leveldbSecond,rdbSecond,leveldb);
+                migrate(leveldb,rdbSecond,null);
+                mergeDb(leveldbSecond,leveldbThird,leveldb);
+                return;
+            }catch(Exception e){
+                spec.commandLine().getErr().println(String.format("Open db %s error."
+                    , name, e.getStackTrace()));
+                throw new RuntimeException(e);
+            }
+        }
         DB levelDb = null, secondDb = null;
         try {
             levelDb = openLevelDb(Paths.get(database.toString(),dbPath,c.getString(PATH_CONFIG_KEY)));
@@ -124,6 +147,53 @@ public class DbExpand implements Callable<Integer> {
         }
         long cost = System.currentTimeMillis() - start;
         spec.commandLine().getOut().println(String.format("Expand db %s done,cost:%s seconds", name, cost / 1000.0));
+    }
+
+    /**
+     * leveldb trans to rdb
+     * @param leveldb source
+     * @param rdb target
+     * @param except not trans
+     */
+    private void migrate(DB leveldb, RocksDB rdb, DB except) {
+        List<byte[]> keys = new ArrayList<>(BATCH);
+        List<byte[]> values = new ArrayList<>(BATCH);
+        try (DBIterator levelIterator = leveldb.iterator(
+            new org.iq80.leveldb.ReadOptions().fillCache(false))) {
+            JniDBFactory.pushMemoryPool(2048 * 2048);
+            levelIterator.seekToFirst();
+
+            while (levelIterator.hasNext()) {
+                Map.Entry<byte[], byte[]> entry = levelIterator.next();
+                if(except!=null && except.get(entry.getKey())!=null) {
+                    continue;
+                }
+                keys.add(entry.getKey());
+                values.add(entry.getValue());
+                if (keys.size() >= BATCH) {
+                    try {
+                        batchInsert(rdb, keys, values);
+                    } catch (Exception e) {
+                        spec.commandLine().getErr().println(String.format("Batch insert kv error %s."
+                            , e.getMessage()));
+                    }
+                }
+            }
+
+            if (!keys.isEmpty()) {
+                try {
+                    batchInsert(rdb, keys, values);
+                } catch (Exception e) {
+                    spec.commandLine().getErr().println(String.format("Batch insert kv error %s."
+                        , e.getMessage()));
+                }
+            }
+        } catch (Exception e) {
+            spec.commandLine().getErr().println(String.format("Merge error %s."
+                , e.getMessage()));
+        } finally {
+            spec.commandLine().getOut().println("Migrate db done");
+        }
     }
 
     private void doTestFileGetInSecond(DB secondDb, String name) {
@@ -251,7 +321,7 @@ public class DbExpand implements Callable<Integer> {
 
     private void doExpandIter(DB levelDb, DB secondDb, String name) {
         try {
-            mergeDb(levelDb, secondDb);
+            mergeDb(levelDb, secondDb,null);
             levelDb.close();
             secondDb.close();
         }catch (Exception e){
@@ -350,7 +420,7 @@ public class DbExpand implements Callable<Integer> {
                 }
             }
             statGetPerformance(secondDb,name,statKeys);
-            mergeDb(secondDb,levelDb);
+            mergeDb(secondDb,levelDb,null);
             statGetPerformance(levelDb,name,statKeys);
         } catch (Exception e) {
             spec.commandLine().getErr().println(String.format("Expand %s error %s."
@@ -427,7 +497,7 @@ public class DbExpand implements Callable<Integer> {
         }
     }
 
-    private void mergeDb(DB originDb, DB targetDb) {
+    private void mergeDb(DB originDb, DB targetDb,DB except) {
         List<byte[]> keys = new ArrayList<>(BATCH);
         List<byte[]> values = new ArrayList<>(BATCH);
         try (DBIterator levelIterator = originDb.iterator(
@@ -437,6 +507,9 @@ public class DbExpand implements Callable<Integer> {
 
             while (levelIterator.hasNext()) {
                 Map.Entry<byte[], byte[]> entry = levelIterator.next();
+                if(except!=null&&except.get(entry.getKey())!=null){
+                    continue;
+                }
                 keys.add(entry.getKey());
                 values.add(entry.getValue());
                 if (keys.size() >= BATCH) {
@@ -507,7 +580,7 @@ public class DbExpand implements Callable<Integer> {
                 }
             }
             if(op==2){
-                mergeDb(levelDb,secondDb);
+                mergeDb(levelDb,secondDb,null);
             }
         } catch (Exception e) {
             spec.commandLine().getErr().println(String.format("Expand %s error %s."
@@ -591,6 +664,20 @@ public class DbExpand implements Callable<Integer> {
         values.clear();
     }
 
+    private void batchInsert(RocksDB db, List<byte[]> keys, List<byte[]> values)
+        throws Exception {
+        try (org.rocksdb.WriteBatch batch = new org.rocksdb.WriteBatch()) {
+            for (int i = 0; i < keys.size(); i++) {
+                byte[] k = keys.get(i);
+                byte[] v = values.get(i);
+                batch.put(k, v);
+            }
+            db.write(new org.rocksdb.WriteOptions(), batch);
+        }
+        keys.clear();
+        values.clear();
+    }
+
     public DB openLevelDb(Path p) throws Exception {
         //特殊库处理
         return factory.open(p.toFile(), getDefaultLevelDbOptions());
@@ -656,5 +743,50 @@ public class DbExpand implements Callable<Integer> {
             }
         }
     }
+
+    public RocksDB initDB(Path path) {
+        RocksDB rdb = null;
+        RocksDbSettings settings = RocksDbSettings.getSettings();
+        try (Options options = new Options()) {
+            // most of these options are suggested by https://github.com/facebook/rocksdb/wiki/Set-Up-Options
+            // general options
+            options.setCreateIfMissing(true);
+            options.setIncreaseParallelism(1);
+            options.setLevelCompactionDynamicLevelBytes(true);
+            options.setMaxOpenFiles(settings.getMaxOpenFiles());
+
+            // general options supported user config
+            options.setNumLevels(settings.getLevelNumber());
+            options.setMaxBytesForLevelMultiplier(settings.getMaxBytesForLevelMultiplier());
+            options.setMaxBytesForLevelBase(settings.getMaxBytesForLevelBase());
+            options.setMaxBackgroundCompactions(settings.getCompactThreads());
+            options.setLevel0FileNumCompactionTrigger(settings.getLevel0FileNumCompactionTrigger());
+            options.setTargetFileSizeMultiplier(settings.getTargetFileSizeMultiplier());
+            options.setTargetFileSizeBase(settings.getTargetFileSizeBase());
+
+            // table options
+            final BlockBasedTableConfig tableCfg;
+            options.setTableFormatConfig(tableCfg = new BlockBasedTableConfig());
+            tableCfg.setBlockSize(settings.getBlockSize());
+            tableCfg.setBlockCache(RocksDbSettings.getCache());
+            tableCfg.setCacheIndexAndFilterBlocks(true);
+            tableCfg.setPinL0FilterAndIndexBlocksInCache(true);
+            tableCfg.setFilter(new BloomFilter(10, false));
+
+            // read options
+            ReadOptions readOpts = new ReadOptions();
+            readOpts = readOpts.setPrefixSameAsStart(true)
+                .setVerifyChecksums(false);
+
+            try {
+                 rdb = RocksDB.open(options,path.toString());
+                 return rdb;
+            } catch (RocksDBException e) {
+                throw new RuntimeException("open fail", e);
+            }
+        }
+
+    }
+
 
 }
