@@ -113,6 +113,7 @@ public class DbExpand implements Callable<Integer> {
                 migrate(leveldbSecond,rdbSecond,leveldb);
                 migrate(leveldb,rdbSecond,null);
                 mergeDb(leveldbSecond,leveldbThird,leveldb);
+                mergeDb(leveldb,leveldbThird,null);
                 return;
             }catch(Exception e){
                 spec.commandLine().getErr().println(String.format("Open db %s error."
