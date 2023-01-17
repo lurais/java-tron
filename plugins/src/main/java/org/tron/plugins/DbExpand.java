@@ -45,6 +45,8 @@ public class DbExpand implements Callable<Integer> {
     private static final String SECOND_PATH_CONFIG_KEY = "secondPath";
     private static final String RATE_CONFIG_KEY = "rate";
     private static final String OP_CONFIG_KEY = "op";// 0直接膨胀 1混合 2先冷后热
+    private static final String LEVEL_ENGINE = "LEVELDB";
+    private static final String ROCKS_ENGINE = "ROCKSDB";
     private static final int BATCH = 1000;
     private Random random = new Random(System.currentTimeMillis());
     public static final byte ADD_PRE_FIX_BYTE_MAINNET = (byte) 0x41;
@@ -104,22 +106,11 @@ public class DbExpand implements Callable<Integer> {
                 ? config.getString(DB_DIRECTORY_CONFIG_KEY) : DEFAULT_DB_DIRECTORY;
         long start = System.currentTimeMillis();
         if(op==20){
-            try(DB leveldb = openLevelDb(Paths.get(database.toString(),dbPath,c.getString(PATH_CONFIG_KEY)));
-                DB leveldbSecond = openLevelDb(Paths.get(database.toString(),dbPath,c.getString(PATH_CONFIG_KEY)+"_second"));
-                DB leveldbThird = openLevelDb(Paths.get(database.toString(),dbPath,c.getString(PATH_CONFIG_KEY)+"_third"));
-                RocksDB rdb = initDB(Paths.get(database.toString(),dbPath,c.getString(PATH_CONFIG_KEY)+"_rdb"));
-                RocksDB rdbSecond = initDB(Paths.get(database.toString(),dbPath,c.getString(NAME_CONFIG_KEY)+"_rdb_second"));){
-                migrate(leveldb,rdb,null);
-                migrate(leveldbSecond,rdbSecond,leveldb);
-                migrate(leveldb,rdbSecond,null);
-                mergeDb(leveldbSecond,leveldbThird,leveldb);
-                mergeDb(leveldb,leveldbThird,null);
-                return;
-            }catch(Exception e){
-                spec.commandLine().getErr().println(String.format("Open db %s error."
-                    , name, e.getStackTrace()));
-                throw new RuntimeException(e);
-            }
+            doExpandLevelAndRocksDB(c, name, dbPath);
+            return;
+        }else if(op==21){
+            doTestFileGetInRocksDB(c,name,dbPath);
+            return;
         }
         DB levelDb = null, secondDb = null;
         try {
@@ -132,22 +123,59 @@ public class DbExpand implements Callable<Integer> {
         }
         spec.commandLine().getOut().println(String.format("Expand db %s begin......", name));
         if(op == 3){
-            doTestTopGet(levelDb,secondDb,name,rate);
+            doTestTopKGet(levelDb,secondDb,name,rate);
         }else if(op==4) {
             doExpandReverse(levelDb,secondDb,name,rate);
         }else if(op==5) {
-            doTestGetInSecond(levelDb,levelDb,name);
+            doTestSerialGetInSecond(levelDb,levelDb,name);
         }else if(op==6){
             doExpandIter(levelDb,secondDb,name);
         }else if(op==7){
             doExportKeys(levelDb,secondDb,name);
         }else if(op==8){
-            doTestFileGetInSecond(secondDb,name);
+            doTestFileDBGetInSecond(secondDb,name,LEVEL_ENGINE);
         }else{
             doExpand(levelDb, secondDb, name, rate, op);
         }
         long cost = System.currentTimeMillis() - start;
         spec.commandLine().getOut().println(String.format("Expand db %s done,cost:%s seconds", name, cost / 1000.0));
+    }
+
+    private void doTestFileGetInRocksDB(Config c, String name, String dbPath) {
+        try(
+            RocksDB rdb = initDB(Paths.get(database.toString(), dbPath,
+                c.getString(PATH_CONFIG_KEY)+"_second"));){
+            doTestFileDBGetInSecond(rdb,name,ROCKS_ENGINE);
+            return;
+        }catch(Exception e){
+            spec.commandLine().getErr().println(String.format("Open db %s error."
+                , name, e.getStackTrace()));
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void doExpandLevelAndRocksDB(Config c, String name, String dbPath) {
+        try(DB leveldb = openLevelDb(Paths.get(database.toString(), dbPath,
+            c.getString(PATH_CONFIG_KEY)));
+            DB leveldbSecond = openLevelDb(Paths.get(database.toString(), dbPath,
+                c.getString(PATH_CONFIG_KEY)+"_second"));
+            DB leveldbThird = openLevelDb(Paths.get(database.toString(), dbPath,
+                c.getString(PATH_CONFIG_KEY)+"_third"));
+            RocksDB rdb = initDB(Paths.get(database.toString(), dbPath,
+                c.getString(PATH_CONFIG_KEY)+"_rdb"));
+            RocksDB rdbSecond = initDB(Paths.get(database.toString(), dbPath,
+                c.getString(NAME_CONFIG_KEY)+"_rdb_second"));){
+            migrate(leveldb,rdb,null);
+            migrate(leveldbSecond,rdbSecond,leveldb);
+            migrate(leveldb,rdbSecond,null);
+            mergeDb(leveldbSecond,leveldbThird,leveldb);
+            mergeDb(leveldb,leveldbThird,null);
+            return;
+        }catch(Exception e){
+            spec.commandLine().getErr().println(String.format("Open db %s error."
+                , name, e.getStackTrace()));
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -197,25 +225,29 @@ public class DbExpand implements Callable<Integer> {
         }
     }
 
-    private void doTestFileGetInSecond(DB secondDb, String name) {
+    private void doTestFileDBGetInSecond(Object db, String name, String engine) {
         try{
         File current = new File(".");
         for(File file:getFileAll(current,new ArrayList<>(),"level")){
-            doTestFileGet(secondDb,name,file);
+            doTestFileGet(db,name,file,engine);
         }
         }catch (IOException e){
             spec.commandLine().getErr().println(String.format("Open file %s error %s."
                     , name+"keys", e.getStackTrace()));
         }finally {
             try {
-                secondDb.close();
+                if(engine.equals(LEVEL_ENGINE)){
+                    ((DB)db).close();
+                }else{
+                    ((RocksDB)db).close();
+                }
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
     }
 
-    private void doTestFileGet(DB secondDb, String name,File keysFile) throws IOException {
+    private void doTestFileGet(Object db, String name,File keysFile,String engine) throws IOException {
         BufferedReader reader = null;
         String perline;
         List<byte[]> keys = new ArrayList<>(BATCH + 30);
@@ -228,12 +260,12 @@ public class DbExpand implements Callable<Integer> {
                     keys.add(structureKey(name) ? generateStructure(name) : shuffleBytes(origin));
                 }
                 if (keys.size() >= BATCH) {
-                    statGetPerformance(secondDb, keysFile.getName(), keys);
+                    statGetPerformance(db, keysFile.getName(), keys,engine);
                     keys.clear();
                 }
             }
             if (keys.size() > 0) {
-                statGetPerformance(secondDb, keysFile.getName(), keys);
+                statGetPerformance(db, keysFile.getName(), keys,engine);
                 keys.clear();
             }
         }catch (Exception e){
@@ -333,10 +365,10 @@ public class DbExpand implements Callable<Integer> {
     private void doExpandReverse(DB levelDb, DB secondDb, String name, int rate) {
         mergeDbReverse(levelDb,secondDb);
         spec.commandLine().getOut().println(String.format("merge db %s done", name));
-        doTestGetInSecond(levelDb,secondDb,name);
+        doTestSerialGetInSecond(levelDb,secondDb,name);
     }
 
-    private void doTestGetInSecond(DB levelDb, DB secondDb, String name) {
+    private void doTestSerialGetInSecond(DB levelDb, DB secondDb, String name) {
         long allStat = 0;
         List<byte[]> keys = new ArrayList<>(BATCH);
         List<byte[]> values = new ArrayList<>(BATCH);
@@ -356,7 +388,7 @@ public class DbExpand implements Callable<Integer> {
                     try {
                         if(r.nextInt(10000) < 10){
                             keys.stream().forEach(key->statKeys.add(key));
-                            statGetPerformance(secondDb,name,statKeys);
+                            statGetPerformance(secondDb,name,statKeys,LEVEL_ENGINE);
                         }
                         statKeys.clear();
                         keys.clear();
@@ -385,7 +417,7 @@ public class DbExpand implements Callable<Integer> {
         }
     }
 
-    private void doTestTopGet(DB levelDb, DB secondDb, String name, int rate) {
+    private void doTestTopKGet(DB levelDb, DB secondDb, String name, int rate) {
         long allStat = 0;
         List<byte[]> keys = new ArrayList<>(BATCH);
         List<byte[]> values = new ArrayList<>(BATCH);
@@ -420,9 +452,9 @@ public class DbExpand implements Callable<Integer> {
                         , name, e.getStackTrace()));
                 }
             }
-            statGetPerformance(secondDb,name,statKeys);
+            statGetPerformance(secondDb,name,statKeys,LEVEL_ENGINE);
             mergeDb(secondDb,levelDb,null);
-            statGetPerformance(levelDb,name,statKeys);
+            statGetPerformance(levelDb,name,statKeys,LEVEL_ENGINE);
         } catch (Exception e) {
             spec.commandLine().getErr().println(String.format("Expand %s error %s."
                 , name, e.getStackTrace()));
@@ -441,23 +473,35 @@ public class DbExpand implements Callable<Integer> {
         }
     }
 
-    private void statGetPerformance(DB secondDb,String name, List<byte[]> statKeys) {
+    private void statGetPerformance(Object db,String name, List<byte[]> statKeys,String engine) {
         if(statKeys==null||statKeys.isEmpty()){
             return;
         }
-        StringBuilder sb = new StringBuilder();
-        StringBuilder sb2 = new StringBuilder();
-        for(byte[] key:statKeys){
-            long begin = System.nanoTime();
-            byte[] value = secondDb.get(key);
-            if(value==null){
-                sb2.append((System.nanoTime() - begin) + ",");
-            }else {
-                sb.append((System.nanoTime() - begin) + ",");
+        try {
+            DB leveldb = null;
+            RocksDB rocksdb = null;
+            if (engine.equals(LEVEL_ENGINE)) {
+                leveldb = (DB) db;
+            } else {
+                rocksdb = (RocksDB) db;
             }
+
+            StringBuilder sb = new StringBuilder();
+            StringBuilder sb2 = new StringBuilder();
+            for (byte[] key : statKeys) {
+                long begin = System.nanoTime();
+                byte[] value = leveldb == null ? rocksdb.get(key) : leveldb.get(key);
+                if (value == null) {
+                    sb2.append((System.nanoTime() - begin) + ",");
+                } else {
+                    sb.append((System.nanoTime() - begin) + ",");
+                }
+            }
+            spec.commandLine().getOut().println(name + " statGet :" + sb.toString());
+            spec.commandLine().getOut().println(name + " statGet notFound:" + sb2.toString());
+        }catch (Exception e){
+            spec.commandLine().getErr().println(String.format("Stat db %s error,exception:%s", name,e.toString()));
         }
-        spec.commandLine().getOut().println(name + " statGet :"+sb.toString());
-        spec.commandLine().getOut().println(name + " statGet notFound:"+sb2.toString());
     }
 
     private void mergeDbReverse(DB originDb, DB targetDb) {
