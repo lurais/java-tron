@@ -613,8 +613,7 @@ public class DbExpand implements Callable<Integer> {
                 expandKeyCount += rate;
                 if (keys.size() >= BATCH) {
                     try {
-                        batchInsert(op==0?levelDb:secondDb, keys, values);
-                        batchInsert(rdb,keys,values);
+                        doubleInsert(op==0?levelDb:secondDb,rdb, keys, values);
                     } catch (Exception e) {
                         spec.commandLine().getErr().println(String.format("Batch insert shuffled kv to %s error %s."
                                 , name, e.getStackTrace()));
@@ -624,8 +623,7 @@ public class DbExpand implements Callable<Integer> {
 
             if (!keys.isEmpty()) {
                 try {
-                    batchInsert(op==0?levelDb:secondDb, keys, values);
-                    batchInsert(rdb,keys,values);
+                    doubleInsert(op==0?levelDb:secondDb,rdb, keys, values);
                 } catch (Exception e) {
                     spec.commandLine().getErr().println(String.format("Batch insert shuffled kv to %s error %s."
                             , name, e.getStackTrace()));
@@ -703,8 +701,28 @@ public class DbExpand implements Callable<Integer> {
         return copyItem;
     }
 
+    private void doubleInsert(DB db,RocksDB rocksDB,List<byte[]> keys,List<byte[]> values) {
+        try {
+            doInsertToLevelDB(db, keys, values);
+            doInsertToRocksDB(rocksDB, keys, values);
+            keys.clear();
+            values.clear();
+        }catch(Exception e){
+            throw new RuntimeException(e);
+        }
+    }
+
     private void batchInsert(DB db, List<byte[]> keys, List<byte[]> values)
             throws Exception {
+        doInsertToLevelDB(db, keys, values);
+        keys.clear();
+        values.clear();
+    }
+
+    private void doInsertToLevelDB(DB db, List<byte[]> keys, List<byte[]> values) throws IOException {
+        if(db==null){
+            return;
+        }
         WriteBatch batch = db.createWriteBatch();
         try {
             for (int i = 0; i < keys.size(); i++) {
@@ -716,12 +734,16 @@ public class DbExpand implements Callable<Integer> {
         } finally {
             batch.close();
         }
-        keys.clear();
-        values.clear();
     }
 
     private void batchInsert(RocksDB db, List<byte[]> keys, List<byte[]> values)
         throws Exception {
+        doInsertToRocksDB(db, keys, values);
+        keys.clear();
+        values.clear();
+    }
+
+    private void doInsertToRocksDB(RocksDB db, List<byte[]> keys, List<byte[]> values) throws RocksDBException {
         if(db==null){
             return;
         }
@@ -733,8 +755,6 @@ public class DbExpand implements Callable<Integer> {
             }
             db.write(new org.rocksdb.WriteOptions(), batch);
         }
-        keys.clear();
-        values.clear();
     }
 
     public DB openLevelDb(Path p) throws Exception {
