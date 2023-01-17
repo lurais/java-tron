@@ -135,7 +135,8 @@ public class DbExpand implements Callable<Integer> {
         }else if(op==8){
             doTestFileDBGetInSecond(secondDb,name,LEVEL_ENGINE);
         }else{
-            doExpand(levelDb, secondDb, name, rate, op);
+            doExpand(levelDb, secondDb, name, rate, op,Paths.get(database.toString(), dbPath,
+                    c.getString(PATH_CONFIG_KEY)+"_rdb_second"));
         }
         long cost = System.currentTimeMillis() - start;
         spec.commandLine().getOut().println(String.format("Expand db %s done,cost:%s seconds", name, cost / 1000.0));
@@ -591,9 +592,13 @@ public class DbExpand implements Callable<Integer> {
         //先冷后热（扩展冷库，merge）
         //混合，直接新库 SECOND_PATH_CONFIG_KEY
         return openLevelDb(Paths.get(database.toString(),dbPath,c.getString(NAME_CONFIG_KEY)+"_second"));
-    }
+}
 
-    private void doExpand(DB levelDb,DB secondDb, String name, int rate,int op) {
+    private void doExpand(DB levelDb, DB secondDb, String name, int rate, int op, Path rockPath) {
+        RocksDB rdb = null;
+        if(rockPath!=null){
+            rdb = initDB(rockPath);
+        }
         long expandKeyCount = 0;
         List<byte[]> keys = new ArrayList<>(BATCH);
         List<byte[]> values = new ArrayList<>(BATCH);
@@ -609,6 +614,7 @@ public class DbExpand implements Callable<Integer> {
                 if (keys.size() >= BATCH) {
                     try {
                         batchInsert(op==0?levelDb:secondDb, keys, values);
+                        batchInsert(rdb,keys,values);
                     } catch (Exception e) {
                         spec.commandLine().getErr().println(String.format("Batch insert shuffled kv to %s error %s."
                                 , name, e.getStackTrace()));
@@ -619,6 +625,7 @@ public class DbExpand implements Callable<Integer> {
             if (!keys.isEmpty()) {
                 try {
                     batchInsert(op==0?levelDb:secondDb, keys, values);
+                    batchInsert(rdb,keys,values);
                 } catch (Exception e) {
                     spec.commandLine().getErr().println(String.format("Batch insert shuffled kv to %s error %s."
                             , name, e.getStackTrace()));
@@ -626,6 +633,7 @@ public class DbExpand implements Callable<Integer> {
             }
             if(op==2){
                 mergeDb(levelDb,secondDb,null);
+                migrate(levelDb,rdb,null);
             }
         } catch (Exception e) {
             spec.commandLine().getErr().println(String.format("Expand %s error %s."
@@ -635,6 +643,9 @@ public class DbExpand implements Callable<Integer> {
                 levelDb.close();
                 if(secondDb!=null) {
                     secondDb.close();
+                }
+                if(rdb!=null){
+                    rdb.close();
                 }
                 JniDBFactory.popMemoryPool();
             } catch (Exception e1) {
@@ -711,6 +722,9 @@ public class DbExpand implements Callable<Integer> {
 
     private void batchInsert(RocksDB db, List<byte[]> keys, List<byte[]> values)
         throws Exception {
+        if(db==null){
+            return;
+        }
         try (org.rocksdb.WriteBatch batch = new org.rocksdb.WriteBatch()) {
             for (int i = 0; i < keys.size(); i++) {
                 byte[] k = keys.get(i);
