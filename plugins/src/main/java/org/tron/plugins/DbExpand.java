@@ -616,7 +616,7 @@ public class DbExpand implements Callable<Integer> {
                         doubleInsert(op==0?levelDb:secondDb,rdb, keys, values);
                     } catch (Exception e) {
                         spec.commandLine().getErr().println(String.format("Batch insert shuffled kv to %s error %s."
-                                , name, e.getStackTrace()));
+                                , name, e.toString()));
                     }
                 }
             }
@@ -626,16 +626,16 @@ public class DbExpand implements Callable<Integer> {
                     doubleInsert(op==0?levelDb:secondDb,rdb, keys, values);
                 } catch (Exception e) {
                     spec.commandLine().getErr().println(String.format("Batch insert shuffled kv to %s error %s."
-                            , name, e.getStackTrace()));
+                            , name, e.toString()));
                 }
             }
             if(op==2){
-                mergeDb(levelDb,secondDb,null);
+               // mergeDb(levelDb,secondDb,null);
                 migrate(levelDb,rdb,null);
             }
         } catch (Exception e) {
             spec.commandLine().getErr().println(String.format("Expand %s error %s."
-                    , name, e.getStackTrace()));
+                    , name, e.toString()));
         } finally {
             try {
                 levelDb.close();
@@ -703,7 +703,7 @@ public class DbExpand implements Callable<Integer> {
 
     private void doubleInsert(DB db,RocksDB rocksDB,List<byte[]> keys,List<byte[]> values) {
         try {
-            doInsertToLevelDB(db, keys, values);
+           // doInsertToLevelDB(db, keys, values);
             doInsertToRocksDB(rocksDB, keys, values);
             keys.clear();
             values.clear();
