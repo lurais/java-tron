@@ -83,9 +83,13 @@ public class LiteFullNodeTool {
     long start = System.currentTimeMillis();
     snapshotDir = Paths.get(snapshotDir, SNAPSHOT_DIR_NAME).toString();
     try {
+      //检查目前是否有65536个区块
       hasEnoughBlock(sourceDir);
+      //获取不在archiveDbs里面的snapshot目录名集合
       List<String> snapshotDbs = getSnapshotDbs(sourceDir);
+      //直接将snapshot的目录拷贝过去目标目录
       split(sourceDir, snapshotDir, snapshotDbs);
+      // 将对应checkpoint数据写入对应的目标库
       mergeCheckpoint2Snapshot(sourceDir, snapshotDir);
       // write genesisBlock , latest recent blocks and trans
       fillSnapshotBlockAndTransDb(sourceDir, snapshotDir);
