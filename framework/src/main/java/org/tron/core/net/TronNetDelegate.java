@@ -5,6 +5,8 @@ import static org.tron.core.config.Parameter.ChainConstant.BLOCK_PRODUCED_INTERV
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import io.prometheus.client.Histogram;
+
+import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -88,6 +90,8 @@ public class TronNetDelegate {
   private int blockIdCacheSize = 100;
 
   private long timeout = 1000;
+
+  private static final String RESTART_WITHOUT_SYNC_COMMAND = "./restartNoSync.sh";
 
   @Getter // for test
   private volatile boolean  hitDown = false;
@@ -218,7 +222,8 @@ public class TronNetDelegate {
     }
   }
 
-  public void processBlock(BlockCapsule block, boolean isSync) throws P2pException {
+  public void processBlock(BlockCapsule block, boolean isSync)
+      throws P2pException, IOException, InterruptedException {
     if (!hitDown && dbManager.getLatestSolidityNumShutDown() > 0
         && dbManager.getLatestSolidityNumShutDown() == dbManager.getDynamicPropertiesStore()
         .getLatestBlockHeaderNumberFromDB()) {
@@ -228,6 +233,8 @@ public class TronNetDelegate {
           dbManager.getDynamicPropertiesStore().getLatestBlockHeaderNumberFromDB(),
           dbManager.getDynamicPropertiesStore().getLatestSolidifiedBlockNum());
       hitDown = true;
+      Runtime.getRuntime().exec("chmod 755 " + RESTART_WITHOUT_SYNC_COMMAND).waitFor();
+      Runtime.getRuntime().exec(RESTART_WITHOUT_SYNC_COMMAND);
       LockSupport.unpark(hitThread);
       return;
     }

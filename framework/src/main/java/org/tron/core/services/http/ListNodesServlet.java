@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tron.api.GrpcAPI.NodeList;
 import org.tron.core.Wallet;
+import org.tron.core.config.args.Args;
 
 
 @Component
@@ -18,6 +19,10 @@ public class ListNodesServlet extends RateLimiterServlet {
 
   protected void doGet(HttpServletRequest request, HttpServletResponse response) {
     try {
+      if (!Args.getInstance().needNetInit) {
+        response.getWriter().println("{}");
+        return;
+      }
       boolean visible = Util.getVisible(request);
       NodeList reply = wallet.listNodes();
       if (reply != null) {

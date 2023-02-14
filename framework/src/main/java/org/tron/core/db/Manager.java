@@ -714,12 +714,6 @@ public class Manager {
               exitCount, blockTime));
     }
 
-    if (exitHeight == headNum) {
-      logger.info("Auto-stop hit: shutDownBlockHeight: {}, currentHeaderNum: {}, exit now",
-          exitHeight, headNum);
-      System.exit(0);
-    }
-
     if (exitCount > 0) {
       CommonParameter.getInstance().setShutdownBlockHeight(headNum + exitCount);
     }

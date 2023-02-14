@@ -68,6 +68,7 @@ public abstract class ConditionallyStopTest extends BlockGenerate {
 
     initDbPath();
     FileUtil.deleteDir(new File(dbPath));
+    FileUtil.saveData("./restartNoSync.sh", "", false);
     logger.info("Full node running.");
     Args.setParam(new String[] {"-d", dbPath, "-w"}, Constant.TEST_CONF);
     Args.getInstance().setNodeListenPort(10000 + port.incrementAndGet());
@@ -91,6 +92,7 @@ public abstract class ConditionallyStopTest extends BlockGenerate {
     Args.clearParam();
     context.destroy();
     FileUtil.deleteDir(new File(dbPath));
+    FileUtil.recursiveDelete("restartNoSync.sh");
   }
 
   private void generateBlock(Map<ByteString, String> witnessAndAccount) throws Exception {

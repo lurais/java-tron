@@ -403,6 +403,11 @@ public class CommonParameter {
   public GenesisBlock genesisBlock;
   @Getter
   @Setter
+  @Parameter(names = {"--net-init"}, description = "Switch for net module initialization. "
+      + "(defalut: true)", arity = 1)
+  public boolean needNetInit = true;
+  @Getter
+  @Setter
   public List<InetSocketAddress> activeNodes;
   @Getter
   @Setter
