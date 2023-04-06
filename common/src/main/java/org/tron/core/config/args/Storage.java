@@ -130,6 +130,14 @@ public class Storage {
   @Setter
   private int dbAutoPruneFrequency;
 
+  @Getter
+  @Setter
+  private int dbAutoPruneSleep;
+
+  @Getter
+  @Setter
+  private int dbAutoPruneWriteBatch;
+
   /**
    * Index storage directory: /path/to/{indexDirectory}
    */

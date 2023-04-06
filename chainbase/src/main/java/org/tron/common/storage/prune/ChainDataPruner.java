@@ -66,6 +66,7 @@ public class ChainDataPruner {
   }
 
   public void prune() throws InterruptedException {
+    logger.info("prune begin......");
     long lowestBlockNumber = chainBaseManager.getBlockStore().getLimitNumber(1, 1).
         stream().map(BlockCapsule::getNum).findFirst().orElse(0L);
     long latestBlockNumber = chainBaseManager.getDynamicPropertiesStore().
@@ -76,8 +77,8 @@ public class ChainDataPruner {
       return;
     }
     while (lowestBlockNumber <= latestBlockNumber - blocksToRetain) {
-      long toFetchCount = (latestBlockNumber - lowestBlockNumber + 1 - blocksToRetain) > 10 ?
-          10 : (latestBlockNumber - lowestBlockNumber + 1 - blocksToRetain);
+      long toFetchCount = (latestBlockNumber - lowestBlockNumber + 1 - blocksToRetain) > CommonParameter.getInstance().getStorage().getDbAutoPruneWriteBatch() ?
+          CommonParameter.getInstance().getStorage().getDbAutoPruneWriteBatch() : (latestBlockNumber - lowestBlockNumber + 1 - blocksToRetain);
       List<BlockCapsule> blockCapsuleList = chainBaseManager.getBlockStore()
           .getLimitNumber(lowestBlockNumber, toFetchCount);
       Map<WrappedByteArray, WrappedByteArray> blockIdBatch = new HashMap<>();
@@ -86,7 +87,7 @@ public class ChainDataPruner {
       prepareWriteBatch(blockIdBatch, blockNumBatch, transIdBatch, blockCapsuleList);
       flushDb(blockIdBatch, blockNumBatch, transIdBatch);
       lowestBlockNumber += toFetchCount;
-      Thread.sleep(100);
+      Thread.sleep(CommonParameter.getInstance().getStorage().getDbAutoPruneSleep());
     }
   }
 

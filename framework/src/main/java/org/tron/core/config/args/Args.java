@@ -526,6 +526,8 @@ public class Args extends CommonParameter {
     PARAMETER.storage.setDbAutoPruneRetain(Storage.getDbAutoPruneRetainFromConfig(config));
     PARAMETER.storage.setDbAutoPruneFrequency(
         Storage.getDbAutoPruneFrequencyFromConfig(config));
+    PARAMETER.storage.setDbAutoPruneSleep(config.getInt("storage.prune.sleep"));
+    PARAMETER.storage.setDbAutoPruneWriteBatch(config.getInt("storage.prune.batch"));
 
     PARAMETER.storage.setDefaultDbOptions(config);
     PARAMETER.storage.setPropertyMapFromConfig(config);
