@@ -93,6 +93,14 @@ public class SolidityNodeTest {
     Block genesisBlock = databaseGrpcClient.getBlock(0);
     Assert.assertNotNull(genesisBlock);
     Assert.assertFalse(genesisBlock.getTransactionsList().isEmpty());
+    Block invalidBlock = databaseGrpcClient.getBlock(-1);
+    Assert.assertNotNull(invalidBlock);
+    try {
+      databaseGrpcClient = new DatabaseGrpcClient(addr, -1);
+    } catch (Exception e) {
+      logger.error("Failed to create database grpc client {}", addr);
+    }
+    databaseGrpcClient.shutdown();
   }
 
 }

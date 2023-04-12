@@ -150,7 +150,7 @@ test {
         exclude 'org/tron/core/ShieldedTRC20BuilderTest.class'
         exclude 'org/tron/common/runtime/vm/WithdrawRewardTest.class'
     }
-    maxHeapSize = "1024m"
+    maxHeapSize = "3072m"
 }
 
 task stest(type: Test) {
