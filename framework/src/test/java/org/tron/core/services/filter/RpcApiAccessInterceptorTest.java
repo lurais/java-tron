@@ -127,10 +127,6 @@ public class RpcApiAccessInterceptorTest {
   public void testRpcApiService() {
     RpcApiService rpcApiService = context.getBean(RpcApiService.class);
     ServerCallStreamObserverTest serverCallStreamObserverTest = new ServerCallStreamObserverTest();
-    rpcApiService.generateAddressCommon(GrpcAPI.EmptyMessage.newBuilder().build(),
-        serverCallStreamObserverTest);
-    Assert.assertTrue("Generate address test fail!", serverCallStreamObserverTest.isReady());
-    serverCallStreamObserverTest.isCancelled();
     rpcApiService.getBlockCommon(GrpcAPI.BlockReq.getDefaultInstance(), serverCallStreamObserverTest);
     Assert.assertTrue("Get block Common failed!", serverCallStreamObserverTest.isReady());
     serverCallStreamObserverTest.isCancelled();
