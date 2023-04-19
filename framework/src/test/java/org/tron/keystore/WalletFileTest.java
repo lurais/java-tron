@@ -22,7 +22,7 @@ public class WalletFileTest extends TestCase {
     Assert.assertTrue(!walletFile1.getAddress().equals(walletFile2.getAddress()));
     Assert.assertTrue(!walletFile1.getCrypto().equals(walletFile2.getCrypto()));
     Assert.assertTrue(!walletFile1.getId().equals(walletFile2.getId()));
-    Assert.assertTrue(walletFile1.getVersion()==walletFile2.getVersion());
+    Assert.assertTrue(walletFile1.getVersion() == walletFile2.getVersion());
   }
 
 }

@@ -25,9 +25,9 @@ public class CredentialsTest extends TestCase {
   @Test
   public void testCreateFromSM2() {
     try {
-          Credentials.create(SM2.fromNodeId(ByteUtil.hexToBytes("fffffffffff" +
-              "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" +
-              "fffffffffffffffffffffffffffffffffffffff")));
+      Credentials.create(SM2.fromNodeId(ByteUtil.hexToBytes("fffffffffff"
+          + "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          + "fffffffffffffffffffffffffffffffffffffff")));
     } catch (Exception e) {
       Assert.isInstanceOf(IllegalArgumentException.class, e);
     }
@@ -41,7 +41,7 @@ public class CredentialsTest extends TestCase {
         SecureRandom.getInstance("NativePRNG"),true));
     Assert.isTrue(!credentials1.equals(credentials2),
         "Credentials instance should be not equal!");
-    Assert.isTrue(!(credentials1.hashCode()==credentials2.hashCode()),
+    Assert.isTrue(!(credentials1.hashCode() == credentials2.hashCode()),
         "Credentials instance hashcode should be not equal!");
   }
 

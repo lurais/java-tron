@@ -127,16 +127,17 @@ public class RpcApiAccessInterceptorTest {
   public void testRpcApiService() {
     RpcApiService rpcApiService = context.getBean(RpcApiService.class);
     ServerCallStreamObserverTest serverCallStreamObserverTest = new ServerCallStreamObserverTest();
-    rpcApiService.getBlockCommon(GrpcAPI.BlockReq.getDefaultInstance(), serverCallStreamObserverTest);
+    rpcApiService.getBlockCommon(GrpcAPI.BlockReq.getDefaultInstance(),
+        serverCallStreamObserverTest);
     Assert.assertTrue("Get block Common failed!", serverCallStreamObserverTest.isReady());
     serverCallStreamObserverTest.isCancelled();
-    rpcApiService.getBrokerageInfoCommon(GrpcAPI.BytesMessage.newBuilder().build()
-        , serverCallStreamObserverTest);
+    rpcApiService.getBrokerageInfoCommon(GrpcAPI.BytesMessage.newBuilder().build(),
+        serverCallStreamObserverTest);
     Assert.assertTrue("Get brokerage info Common failed!",
         serverCallStreamObserverTest.isReady());
     serverCallStreamObserverTest.isCancelled();
-    rpcApiService.getBurnTrxCommon(GrpcAPI.EmptyMessage.newBuilder().build()
-        , serverCallStreamObserverTest);
+    rpcApiService.getBurnTrxCommon(GrpcAPI.EmptyMessage.newBuilder().build(),
+        serverCallStreamObserverTest);
     Assert.assertTrue("Get burn trx common failed!",
         serverCallStreamObserverTest.isReady());
     serverCallStreamObserverTest.isCancelled();
@@ -168,58 +169,58 @@ public class RpcApiAccessInterceptorTest {
   }
 
 
-    class ServerCallStreamObserverTest extends ServerCallStreamObserver {
+  class ServerCallStreamObserverTest extends ServerCallStreamObserver {
 
-      Object ret;
+    Object ret;
 
-      @Override
-      public boolean isCancelled() {
-        ret = null;
-        return true;
-      }
-
-      @Override
-      public void setOnCancelHandler(Runnable onCancelHandler) {
-      }
-
-      @Override
-      public void setCompression(String compression) {
-      }
-
-      @Override
-      public boolean isReady() {
-        return Objects.nonNull(ret);
-      }
-
-      @Override
-      public void setOnReadyHandler(Runnable onReadyHandler) {
-      }
-
-      @Override
-      public void disableAutoInboundFlowControl() {
-      }
-
-      @Override
-      public void request(int count) {
-      }
-
-      @Override
-      public void setMessageCompression(boolean enable) {
-      }
-
-      @Override
-      public void onNext(Object value) {
-        ret = value;
-      }
-
-      @Override
-      public void onError(Throwable t) {
-      }
-
-      @Override
-      public void onCompleted() {
-      }
+    @Override
+    public boolean isCancelled() {
+      ret = null;
+      return true;
     }
+
+    @Override
+    public void setOnCancelHandler(Runnable onCancelHandler) {
+    }
+
+    @Override
+    public void setCompression(String compression) {
+    }
+
+    @Override
+    public boolean isReady() {
+      return Objects.nonNull(ret);
+    }
+
+    @Override
+    public void setOnReadyHandler(Runnable onReadyHandler) {
+    }
+
+    @Override
+    public void disableAutoInboundFlowControl() {
+    }
+
+    @Override
+    public void request(int count) {
+    }
+
+    @Override
+    public void setMessageCompression(boolean enable) {
+    }
+
+    @Override
+    public void onNext(Object value) {
+      ret = value;
+    }
+
+    @Override
+    public void onError(Throwable t) {
+    }
+
+    @Override
+    public void onCompleted() {
+    }
+  }
 
 
   @Test
