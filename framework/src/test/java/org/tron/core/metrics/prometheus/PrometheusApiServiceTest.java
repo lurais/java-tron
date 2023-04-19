@@ -15,7 +15,6 @@ import javax.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.tron.common.BaseTest;
 import org.tron.common.crypto.ECKey;
@@ -103,7 +102,6 @@ public class PrometheusApiServiceTest extends BaseTest {
   }
 
   @Test
-  @Ignore
   public void testMetric() throws Exception {
 
     final ECKey ecKey = ECKey.fromPrivate(privateKey);
