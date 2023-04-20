@@ -1,0 +1,7 @@
+#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+#Wed Apr 19 23:40:20 CST 2023
+http\://maven.aliyun.com/nexus/content/repositories/central/.lastUpdated=1681918819999
+http\://repo.fusesource.com/nexus/content/groups/public-snapshots/.error=Could not transfer artifact org.fusesource\:fusesource-pom\:pom\:1.11 from/to fusesource.nexus.snapshot (http\://repo.fusesource.com/nexus/content/groups/public-snapshots)\: Failed to transfer file http\://repo.fusesource.com/nexus/content/groups/public-snapshots/org/fusesource/fusesource-pom/1.11/fusesource-pom-1.11.pom with status code 503
+@default-fusesource-releases-http\://repo.fusesource.com/nexus/content/groups/public/.lastUpdated=1681918819551
+http\://repo.fusesource.com/nexus/content/groups/public/.error=Could not transfer artifact org.fusesource\:fusesource-pom\:pom\:1.11 from/to fusesource-releases (http\://repo.fusesource.com/nexus/content/groups/public)\: Failed to transfer file http\://repo.fusesource.com/nexus/content/groups/public/org/fusesource/fusesource-pom/1.11/fusesource-pom-1.11.pom with status code 503
+@default-fusesource.nexus.snapshot-http\://repo.fusesource.com/nexus/content/groups/public-snapshots/.lastUpdated=1681918818361

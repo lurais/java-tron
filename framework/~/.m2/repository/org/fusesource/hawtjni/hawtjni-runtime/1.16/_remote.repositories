@@ -1,0 +1,4 @@
+#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+#Wed Apr 19 23:41:21 CST 2023
+hawtjni-runtime-1.16.jar>sonatype-nexus=
+hawtjni-runtime-1.16.pom>sonatype-nexus=

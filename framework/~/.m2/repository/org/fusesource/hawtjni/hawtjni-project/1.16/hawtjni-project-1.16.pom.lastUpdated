@@ -1,0 +1,7 @@
+#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+#Wed Apr 19 23:40:17 CST 2023
+http\://maven.aliyun.com/nexus/content/repositories/central/.lastUpdated=1681918817253
+http\://repo.fusesource.com/nexus/content/groups/public-snapshots/.error=Could not transfer artifact org.fusesource.hawtjni\:hawtjni-project\:pom\:1.16 from/to fusesource.nexus.snapshot (http\://repo.fusesource.com/nexus/content/groups/public-snapshots)\: Failed to transfer file http\://repo.fusesource.com/nexus/content/groups/public-snapshots/org/fusesource/hawtjni/hawtjni-project/1.16/hawtjni-project-1.16.pom with status code 503
+@default-fusesource-releases-http\://repo.fusesource.com/nexus/content/groups/public/.lastUpdated=1681918816928
+http\://repo.fusesource.com/nexus/content/groups/public/.error=Could not transfer artifact org.fusesource.hawtjni\:hawtjni-project\:pom\:1.16 from/to fusesource-releases (http\://repo.fusesource.com/nexus/content/groups/public)\: Failed to transfer file http\://repo.fusesource.com/nexus/content/groups/public/org/fusesource/hawtjni/hawtjni-project/1.16/hawtjni-project-1.16.pom with status code 503
+@default-fusesource.nexus.snapshot-http\://repo.fusesource.com/nexus/content/groups/public-snapshots/.lastUpdated=1681918815867

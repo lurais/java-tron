@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata modelVersion="1.1.0">
+  <groupId>org.fusesource.leveldbjni</groupId>
+  <artifactId>leveldbjni-project</artifactId>
+  <version>99-master-SNAPSHOT</version>
+  <versioning>
+    <snapshot>
+      <localCopy>true</localCopy>
+    </snapshot>
+    <lastUpdated>20230419154008</lastUpdated>
+    <snapshotVersions>
+      <snapshotVersion>
+        <extension>pom</extension>
+        <value>99-master-SNAPSHOT</value>
+        <updated>20230419154008</updated>
+      </snapshotVersion>
+    </snapshotVersions>
+  </versioning>
+</metadata>

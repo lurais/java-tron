@@ -1,0 +1,5 @@
+#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+#Wed Apr 19 23:41:21 CST 2023
+http\://repo.fusesource.com/nexus/content/groups/public-snapshots/.error=Could not transfer artifact org.fusesource.hawtjni\:hawtjni-runtime\:jar\:1.16 from/to fusesource.nexus.snapshot (http\://repo.fusesource.com/nexus/content/groups/public-snapshots)\: Failed to transfer file http\://repo.fusesource.com/nexus/content/groups/public-snapshots/org/fusesource/hawtjni/hawtjni-runtime/1.16/hawtjni-runtime-1.16.jar with status code 503
+https\://oss.sonatype.org/content/repositories/public/.lastUpdated=1681918881841
+@default-fusesource.nexus.snapshot-http\://repo.fusesource.com/nexus/content/groups/public-snapshots/.lastUpdated=1681918876595

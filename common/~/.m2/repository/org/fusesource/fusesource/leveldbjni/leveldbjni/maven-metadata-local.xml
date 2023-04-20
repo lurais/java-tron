@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <groupId>org.fusesource.leveldbjni</groupId>
+  <artifactId>leveldbjni</artifactId>
+  <versioning>
+    <versions>
+      <version>99-master-SNAPSHOT</version>
+    </versions>
+    <lastUpdated>20230419154732</lastUpdated>
+  </versioning>
+</metadata>

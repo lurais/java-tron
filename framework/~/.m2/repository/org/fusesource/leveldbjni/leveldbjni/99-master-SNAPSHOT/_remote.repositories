@@ -1,0 +1,7 @@
+#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+#Wed Apr 19 23:47:32 CST 2023
+leveldbjni-99-master-SNAPSHOT.pom>=
+leveldbjni-99-master-SNAPSHOT-sources.jar>=
+leveldbjni-99-master-SNAPSHOT-tests.jar>=
+leveldbjni-99-master-SNAPSHOT-native-src.zip>=
+leveldbjni-99-master-SNAPSHOT.jar>=
