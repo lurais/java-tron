@@ -9,7 +9,7 @@ sourceCompatibility = 1.8
 // Dependency versions
 // ---------------------------------------
 
-def leveldbVersion = "1.8"
+def leveldbVersion = "99-master-SNAPSHOT"
 // --------------------------------------
 
 static def isWindows() {
