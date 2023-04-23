@@ -3,10 +3,12 @@ package org.tron.program;
 import static org.fusesource.leveldbjni.JniDBFactory.factory;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -23,10 +25,12 @@ import org.fusesource.leveldbjni.JniDBFactory;
 import org.iq80.leveldb.CompressionType;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBIterator;
+import org.iq80.leveldb.WriteBatch;
 import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.BloomFilter;
 import org.rocksdb.ComparatorOptions;
 import org.rocksdb.Options;
+import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
@@ -35,6 +39,8 @@ import org.tron.common.utils.FileUtil;
 import org.tron.common.utils.MarketOrderPriceComparatorForLevelDB;
 import org.tron.common.utils.MarketOrderPriceComparatorForRockDB;
 import org.tron.common.utils.PropUtil;
+import org.tron.core.db2.common.LevelDB;
+import org.tron.core.db2.common.WrappedByteArray;
 
 @Slf4j
 public class DBConvert implements Callable<Boolean> {
@@ -185,7 +191,7 @@ public class DBConvert implements Callable<Boolean> {
     Options options = new Options();
     options.setCreateIfMissing(true);
     options.setIncreaseParallelism(1);
-    options.setNumLevels(7);
+    options.setNumLevels(10000);
     options.setMaxOpenFiles(5000);
     options.setTargetFileSizeBase(64 * 1024 * 1024);
     options.setTargetFileSizeMultiplier(1);
@@ -210,6 +216,7 @@ public class DBConvert implements Callable<Boolean> {
   public RocksDB newRocksDb(Path db) {
     RocksDB database = null;
     try (Options options = newDefaultRocksDbOptions()) {
+      options.setNumLevels(1000);
       database = RocksDB.open(options, db.toString());
     } catch (Exception e) {
       logger.error("{}", e);
@@ -227,6 +234,18 @@ public class DBConvert implements Callable<Boolean> {
       }
       write(rocks, batch);
     }
+    keys.clear();
+    values.clear();
+  }
+
+  private void batchInsert(DB level, List<byte[]> keys, List<byte[]> values) {
+    WriteBatch batch = level.createWriteBatch();
+    for (int i = 0; i < keys.size(); i++) {
+      byte[] k = keys.get(i);
+      byte[] v = values.get(i);
+      batch.put(k, v);
+    }
+    write(level, batch);
     keys.clear();
     values.clear();
   }
@@ -251,6 +270,14 @@ public class DBConvert implements Callable<Boolean> {
     }
   }
 
+  private void write(DB db, WriteBatch batch) {
+    try {
+      db.write(batch);
+    } catch (Exception e) {
+      throw e;
+    }
+  }
+
   private boolean maybeRetry(RocksDBException e) {
     boolean retry = false;
     if (e.getStatus() != null) {
@@ -269,20 +296,16 @@ public class DBConvert implements Callable<Boolean> {
    * @param rocks rocksdb
    * @return if ok
    */
-  public boolean convertLevelToRocksBatchIterator(DB level, RocksDB rocks) {
+  public boolean convertLevelToRocksBatchIterator(RocksDB rocks, DB level) {
     // convert
     List<byte[]> keys = new ArrayList<>(BATCH);
     List<byte[]> values = new ArrayList<>(BATCH);
-    try (DBIterator levelIterator = level.iterator(
-        new org.iq80.leveldb.ReadOptions().fillCache(false))) {
-
-      JniDBFactory.pushMemoryPool(1024 * 1024);
-      levelIterator.seekToFirst();
-
-      while (levelIterator.hasNext()) {
-        Map.Entry<byte[], byte[]> entry = levelIterator.next();
-        byte[] key = entry.getKey();
-        byte[] value = entry.getValue();
+    JniDBFactory.pushMemoryPool(1024 * 1024);
+    try (org.rocksdb.ReadOptions r = new org.rocksdb.ReadOptions().setFillCache(false);
+         RocksIterator rocksIterator = rocks.newIterator(r)) {
+      for (rocksIterator.seekToFirst(); rocksIterator.isValid(); rocksIterator.next()) {
+        byte[] key = rocksIterator.key();
+        byte[] value = rocksIterator.value();
         srcDbKeyCount++;
         srcDbKeySum = byteArrayToIntWithOne(srcDbKeySum, key);
         srcDbValueSum = byteArrayToIntWithOne(srcDbValueSum, value);
@@ -290,24 +313,23 @@ public class DBConvert implements Callable<Boolean> {
         values.add(value);
         if (keys.size() >= BATCH) {
           try {
-            batchInsert(rocks, keys, values);
+            batchInsert(level, keys, values);
           } catch (Exception e) {
             logger.error("{}", e);
             return false;
           }
         }
       }
-
       if (!keys.isEmpty()) {
         try {
-          batchInsert(rocks, keys, values);
+          batchInsert(level, keys, values);
         } catch (Exception e) {
           logger.error("{}", e);
           return false;
         }
       }
       // check
-      check(rocks);
+      check(level);
     }  catch (Exception e) {
       logger.error("{}", e);
       return false;
@@ -324,22 +346,22 @@ public class DBConvert implements Callable<Boolean> {
         && dstDbValueSum == srcDbValueSum;
   }
 
-  private void check(RocksDB rocks) throws RocksDBException {
+  private void check(DB level) {
     logger.info("check database {} start", this.dbName);
-    // manually call CompactRange()
-    logger.info("compact database {} start", this.dbName);
-    rocks.compactRange();
-    logger.info("compact database {} end", this.dbName);
-    // check
-    try (org.rocksdb.ReadOptions r = new org.rocksdb.ReadOptions().setFillCache(false);
-         RocksIterator rocksIterator = rocks.newIterator(r)) {
-      for (rocksIterator.seekToFirst(); rocksIterator.isValid(); rocksIterator.next()) {
-        byte[] key = rocksIterator.key();
-        byte[] value = rocksIterator.value();
+    try (DBIterator levelIterator = level.iterator(
+        new org.iq80.leveldb.ReadOptions().fillCache(false))) {
+      JniDBFactory.pushMemoryPool(1024 * 1024);
+      levelIterator.seekToFirst();
+      while (levelIterator.hasNext()) {
+        Map.Entry<byte[], byte[]> entry = levelIterator.next();
+        byte[] key = entry.getKey();
+        byte[] value = entry.getValue();
         dstDbKeyCount++;
         dstDbKeySum = byteArrayToIntWithOne(dstDbKeySum, key);
         dstDbValueSum = byteArrayToIntWithOne(dstDbValueSum, value);
       }
+    } catch (IOException e) {
+      logger.error("check database {} error", this.dbName, e);
     }
     logger.info("check database {} end", this.dbName);
   }
@@ -351,7 +373,7 @@ public class DBConvert implements Callable<Boolean> {
       return false;
     }
 
-    return PropUtil.writeProperty(enginePath, "ENGINE", "ROCKSDB");
+    return PropUtil.writeProperty(enginePath, "ENGINE", "LEVELDB");
   }
 
   public boolean checkDone(String dir) {
@@ -367,13 +389,13 @@ public class DBConvert implements Callable<Boolean> {
       return true;
     }
 
-    File levelDbFile = srcDbPath.toFile();
-    if (!levelDbFile.exists()) {
+    File rocksDbFile = srcDbPath.toFile();
+    if (!rocksDbFile.exists()) {
       logger.info(" {} does not exist.", srcDbPath.toString());
       return false;
     }
 
-    DB level = newLevelDb(srcDbPath);
+    RocksDB rocks = newRocksDb(srcDbPath);
 
     if (this.dstDbPath.toFile().exists()) {
       logger.info(" {} begin to clear exist database directory", this.dbName);
@@ -382,10 +404,10 @@ public class DBConvert implements Callable<Boolean> {
     }
 
     FileUtil.createDirIfNotExists(dstDir);
-    RocksDB rocks = newRocksDb(dstDbPath);
+    DB level = newLevelDb(dstDbPath);
 
     logger.info("Convert database {} start", this.dbName);
-    boolean result  = convertLevelToRocksBatchIterator(level, rocks)
+    boolean result  = convertLevelToRocksBatchIterator(rocks,level)
         && createEngine(dstDbPath.toString());
     long etime = System.currentTimeMillis();
 
