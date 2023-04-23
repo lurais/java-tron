@@ -56,7 +56,7 @@ public abstract class TronStoreWithRevoking<T extends ProtoCapsule> implements I
   protected TronStoreWithRevoking(String dbName) {
     String dbEngine = CommonParameter.getInstance().getStorage().getDbEngine();
     if ("LEVELDB".equals(dbEngine.toUpperCase())) {
-      this.db =  new LevelDB(
+      //this.db =  new LevelDB(
           new LevelDbDataSourceImpl(StorageUtils.getOutputDirectoryByDbName(dbName),
               dbName,
               getOptionsByDbNameForLevelDB(dbName),
