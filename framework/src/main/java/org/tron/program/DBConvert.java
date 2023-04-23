@@ -238,14 +238,15 @@ public class DBConvert implements Callable<Boolean> {
     values.clear();
   }
 
-  private void batchInsert(DB level, List<byte[]> keys, List<byte[]> values) {
-    WriteBatch batch = level.createWriteBatch();
-    for (int i = 0; i < keys.size(); i++) {
-      byte[] k = keys.get(i);
-      byte[] v = values.get(i);
-      batch.put(k, v);
+  private void batchInsert(DB level, List<byte[]> keys, List<byte[]> values) throws IOException {
+    try (WriteBatch batch = level.createWriteBatch()) {
+      for (int i = 0; i < keys.size(); i++) {
+        byte[] k = keys.get(i);
+        byte[] v = values.get(i);
+        batch.put(k, v);
+      }
+      write(level, batch);
     }
-    write(level, batch);
     keys.clear();
     values.clear();
   }
