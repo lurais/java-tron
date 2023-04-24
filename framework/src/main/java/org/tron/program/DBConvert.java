@@ -8,7 +8,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -30,7 +29,6 @@ import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.BloomFilter;
 import org.rocksdb.ComparatorOptions;
 import org.rocksdb.Options;
-import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
@@ -39,8 +37,6 @@ import org.tron.common.utils.FileUtil;
 import org.tron.common.utils.MarketOrderPriceComparatorForLevelDB;
 import org.tron.common.utils.MarketOrderPriceComparatorForRockDB;
 import org.tron.common.utils.PropUtil;
-import org.tron.core.db2.common.LevelDB;
-import org.tron.core.db2.common.WrappedByteArray;
 
 @Slf4j
 public class DBConvert implements Callable<Boolean> {
@@ -191,7 +187,7 @@ public class DBConvert implements Callable<Boolean> {
     Options options = new Options();
     options.setCreateIfMissing(true);
     options.setIncreaseParallelism(1);
-    options.setNumLevels(10000);
+    options.setNumLevels(7);
     options.setMaxOpenFiles(5000);
     options.setTargetFileSizeBase(64 * 1024 * 1024);
     options.setTargetFileSizeMultiplier(1);
@@ -209,14 +205,13 @@ public class DBConvert implements Callable<Boolean> {
     tableCfg.setCacheIndexAndFilterBlocks(true);
     tableCfg.setPinL0FilterAndIndexBlocksInCache(true);
     tableCfg.setFilter(new BloomFilter(10, false));
-    options.prepareForBulkLoad();
+    //options.prepareForBulkLoad();
     return options;
   }
 
   public RocksDB newRocksDb(Path db) {
     RocksDB database = null;
     try (Options options = newDefaultRocksDbOptions()) {
-      options.setNumLevels(1000);
       database = RocksDB.open(options, db.toString());
     } catch (Exception e) {
       logger.error("{}", e);
