@@ -1,15 +1,21 @@
 package org.tron.program;
 
 import static org.fusesource.leveldbjni.JniDBFactory.factory;
+import static org.lmdbjava.DbiFlags.MDB_CREATE;
+import static org.lmdbjava.PutFlags.MDB_APPEND;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Random;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -23,6 +29,14 @@ import org.fusesource.leveldbjni.JniDBFactory;
 import org.iq80.leveldb.CompressionType;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBIterator;
+import org.iq80.leveldb.WriteBatch;
+import org.lmdbjava.Cursor;
+import org.lmdbjava.CursorIterable;
+import org.lmdbjava.Dbi;
+import org.lmdbjava.Env;
+import org.lmdbjava.KeyRange;
+import org.lmdbjava.PutFlags;
+import org.lmdbjava.Txn;
 import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.BloomFilter;
 import org.rocksdb.ComparatorOptions;
@@ -163,7 +177,7 @@ public class DBConvert implements Callable<Boolean> {
 
     esDb.shutdown();
     logger.info("database convert use {} seconds total.",
-            (System.currentTimeMillis() - time) / 1000);
+        (System.currentTimeMillis() - time) / 1000);
     if (fails > 0) {
       logger.error("failed!!!!!!!!!!!!!!!!!!!!!!!! size:{}", fails);
     }
@@ -203,7 +217,7 @@ public class DBConvert implements Callable<Boolean> {
     tableCfg.setCacheIndexAndFilterBlocks(true);
     tableCfg.setPinL0FilterAndIndexBlocksInCache(true);
     tableCfg.setFilter(new BloomFilter(10, false));
-    options.prepareForBulkLoad();
+    //options.prepareForBulkLoad();
     return options;
   }
 
@@ -231,6 +245,19 @@ public class DBConvert implements Callable<Boolean> {
     values.clear();
   }
 
+  private void batchInsert(DB level, List<byte[]> keys, List<byte[]> values) throws IOException {
+    try (WriteBatch batch = level.createWriteBatch()) {
+      for (int i = 0; i < keys.size(); i++) {
+        byte[] k = keys.get(i);
+        byte[] v = values.get(i);
+        batch.put(k, v);
+      }
+      write(level, batch);
+    }
+    keys.clear();
+    values.clear();
+  }
+
   /**
    * https://github.com/facebook/rocksdb/issues/6625
    * @param rocks db
@@ -248,6 +275,14 @@ public class DBConvert implements Callable<Boolean> {
       } else {
         throw e;
       }
+    }
+  }
+
+  private void write(DB db, WriteBatch batch) {
+    try {
+      db.write(batch);
+    } catch (Exception e) {
+      throw e;
     }
   }
 
@@ -269,20 +304,37 @@ public class DBConvert implements Callable<Boolean> {
    * @param rocks rocksdb
    * @return if ok
    */
-  public boolean convertLevelToRocksBatchIterator(DB level, RocksDB rocks) {
+  public boolean convertLevelToRocksBatchIterator(RocksDB rocks, DB level) {
     // convert
     List<byte[]> keys = new ArrayList<>(BATCH);
     List<byte[]> values = new ArrayList<>(BATCH);
-    try (DBIterator levelIterator = level.iterator(
-        new org.iq80.leveldb.ReadOptions().fillCache(false))) {
+    List<byte[]> randKeys = new ArrayList<>(100000);
+    JniDBFactory.pushMemoryPool(1024 * 1024);
 
-      JniDBFactory.pushMemoryPool(1024 * 1024);
-      levelIterator.seekToFirst();
+    //init randkeys
+    Random rand = new Random(System.currentTimeMillis());
+    try (org.rocksdb.ReadOptions r = new org.rocksdb.ReadOptions().setFillCache(false);
+         RocksIterator rocksIterator = rocks.newIterator(r)) {
+      for (rocksIterator.seekToFirst(); rocksIterator.isValid(); rocksIterator.next()) {
+        byte[] key = rocksIterator.key();
+        if (randKeys.size() < 100000 && rand.nextInt(1000) < 10) {
+          if(rand.nextInt(100)<10){
+            //randKeys.add(r) 加入随机key
+          } else {
+            randKeys.add(key);
+          }
+        }
+      }
+    }
+    Collections.shuffle(randKeys);
 
-      while (levelIterator.hasNext()) {
-        Map.Entry<byte[], byte[]> entry = levelIterator.next();
-        byte[] key = entry.getKey();
-        byte[] value = entry.getValue();
+    logger.info("seq write level begin.....");
+    // level test
+    try (org.rocksdb.ReadOptions r = new org.rocksdb.ReadOptions().setFillCache(false);
+         RocksIterator rocksIterator = rocks.newIterator(r)) {
+      for (rocksIterator.seekToFirst(); rocksIterator.isValid(); rocksIterator.next()) {
+        byte[] key = rocksIterator.key();
+        byte[] value = rocksIterator.value();
         srcDbKeyCount++;
         srcDbKeySum = byteArrayToIntWithOne(srcDbKeySum, key);
         srcDbValueSum = byteArrayToIntWithOne(srcDbValueSum, value);
@@ -290,55 +342,161 @@ public class DBConvert implements Callable<Boolean> {
         values.add(value);
         if (keys.size() >= BATCH) {
           try {
-            batchInsert(rocks, keys, values);
+            batchInsert(level, keys, values);
           } catch (Exception e) {
             logger.error("{}", e);
             return false;
           }
         }
       }
-
       if (!keys.isEmpty()) {
         try {
-          batchInsert(rocks, keys, values);
+          batchInsert(level, keys, values);
         } catch (Exception e) {
           logger.error("{}", e);
           return false;
         }
       }
+      logger.info("seq write level end....");
       // check
-      check(rocks);
+      check(level);
     }  catch (Exception e) {
       logger.error("{}", e);
       return false;
     } finally {
       try {
         level.close();
+      } catch (Exception e1) {
+        logger.error("{}", e1);
+      }
+    }
+    boolean checkLevelOk = dstDbKeyCount == srcDbKeyCount && dstDbKeySum == srcDbKeySum
+        && dstDbValueSum == srcDbValueSum;
+    // random get
+    logger.info("level rand get begin....");
+    for(byte[] b : randKeys){
+      byte[] v = level.get(b);
+    }
+    logger.info("level rand get end....");
+
+
+
+    File dbDirectory = new File("./");
+    Env dbEnvironment = Env.create().setMapSize((long)1e9).setMaxDbs(1).open(dbDirectory);
+    //dbEnvironment = Env.create().setMapSize(1_824).setMaxDbs(1).open(dbDirectory);
+    Dbi db = dbEnvironment.openDbi(dbName, MDB_CREATE);
+
+    //lmdb test
+    logger.info("write to lmdb begin....");
+    try (org.rocksdb.ReadOptions r = new org.rocksdb.ReadOptions().setFillCache(false);
+         RocksIterator rocksIterator = rocks.newIterator(r)) {
+      for (rocksIterator.seekToFirst(); rocksIterator.isValid(); rocksIterator.next()) {
+        byte[] key = rocksIterator.key();
+        byte[] value = rocksIterator.value();
+        srcDbKeyCount++;
+        srcDbKeySum = byteArrayToIntWithOne(srcDbKeySum, key);
+        srcDbValueSum = byteArrayToIntWithOne(srcDbValueSum, value);
+        keys.add(key);
+        values.add(value);
+        if (keys.size() >= BATCH) {
+          try {
+            write(db,keys,values);
+          } catch (Exception e) {
+            logger.error("{}", e);
+            return false;
+          }
+        }
+      }
+      if (!keys.isEmpty()) {
+        try {
+          write(db,keys,values);
+        } catch (Exception e) {
+          logger.error("{}", e);
+          return false;
+        }
+      }
+      logger.info("write lmdb end...");
+      // check
+      check(dbEnvironment,db);
+    }  catch (Exception e) {
+      logger.error("{}", e);
+      return false;
+    } finally {
+      try {
         rocks.close();
         JniDBFactory.popMemoryPool();
       } catch (Exception e1) {
         logger.error("{}", e1);
       }
     }
-    return dstDbKeyCount == srcDbKeyCount && dstDbKeySum == srcDbKeySum
+    boolean checkLmdbOk = dstDbKeyCount == srcDbKeyCount && dstDbKeySum == srcDbKeySum
         && dstDbValueSum == srcDbValueSum;
+    // random get
+    logger.info("random get lmdb begin....");
+    try (Txn<ByteBuffer> txn = dbEnvironment.txnWrite()) {
+      for(byte[] b : randKeys){
+        Object v = db.get(txn,toBuffer(b));
+      }
+    }
+    logger.info("random get lmdb end......");
+    return checkLmdbOk;
   }
 
-  private void check(RocksDB rocks) throws RocksDBException {
+
+  void write(Dbi db, List<byte[]> keys, List<byte[]> values) {
+    int i=0;
+    while(i<keys.size()){
+      db.put(toBuffer(keys.get(i)), toBuffer(values.get(i)));
+      i++;
+    }
+    keys.clear();
+    values.clear();
+  }
+
+  public ByteBuffer toBuffer(byte[] bytes) {
+    ByteBuffer buffer = ByteBuffer.allocateDirect(bytes.length);
+    buffer.put(bytes);
+    buffer.flip();
+    return buffer;
+  }
+
+  private void check(DB level) {
     logger.info("check database {} start", this.dbName);
-    // manually call CompactRange()
-    logger.info("compact database {} start", this.dbName);
-    rocks.compactRange();
-    logger.info("compact database {} end", this.dbName);
-    // check
-    try (org.rocksdb.ReadOptions r = new org.rocksdb.ReadOptions().setFillCache(false);
-         RocksIterator rocksIterator = rocks.newIterator(r)) {
-      for (rocksIterator.seekToFirst(); rocksIterator.isValid(); rocksIterator.next()) {
-        byte[] key = rocksIterator.key();
-        byte[] value = rocksIterator.value();
+    try (DBIterator levelIterator = level.iterator(
+        new org.iq80.leveldb.ReadOptions().fillCache(false))) {
+      JniDBFactory.pushMemoryPool(1024 * 1024);
+      levelIterator.seekToFirst();
+      while (levelIterator.hasNext()) {
+        Map.Entry<byte[], byte[]> entry = levelIterator.next();
+        byte[] key = entry.getKey();
+        byte[] value = entry.getValue();
         dstDbKeyCount++;
         dstDbKeySum = byteArrayToIntWithOne(dstDbKeySum, key);
         dstDbValueSum = byteArrayToIntWithOne(dstDbValueSum, value);
+      }
+    } catch (IOException e) {
+      logger.error("check database {} error", this.dbName, e);
+    }
+    logger.info("check database {} end", this.dbName);
+  }
+
+  private byte[] toByteArray(ByteBuffer byteBuffer) {
+    byte[] bytesArray = new byte[byteBuffer.remaining()];
+    byteBuffer.get(bytesArray, 0, bytesArray.length);
+    return bytesArray;
+  }
+
+  private void check(Env env,Dbi db) {
+    logger.info("check database {} start", this.dbName);
+    try (Txn<ByteBuffer> txn = env.txnWrite()) {
+      try (CursorIterable<ByteBuffer> ci = db.iterate(txn, KeyRange.all())) {
+        for (final CursorIterable.KeyVal<ByteBuffer> kv : ci) {
+          byte[] key = toByteArray(kv.key());
+          byte[] value = toByteArray(kv.val());
+          dstDbKeyCount++;
+          dstDbKeySum = byteArrayToIntWithOne(dstDbKeySum, key);
+          dstDbValueSum = byteArrayToIntWithOne(dstDbValueSum, value);
+        }
       }
     }
     logger.info("check database {} end", this.dbName);
@@ -351,7 +509,7 @@ public class DBConvert implements Callable<Boolean> {
       return false;
     }
 
-    return PropUtil.writeProperty(enginePath, "ENGINE", "ROCKSDB");
+    return PropUtil.writeProperty(enginePath, "ENGINE", "LEVELDB");
   }
 
   public boolean checkDone(String dir) {
@@ -367,13 +525,13 @@ public class DBConvert implements Callable<Boolean> {
       return true;
     }
 
-    File levelDbFile = srcDbPath.toFile();
-    if (!levelDbFile.exists()) {
+    File rocksDbFile = srcDbPath.toFile();
+    if (!rocksDbFile.exists()) {
       logger.info(" {} does not exist.", srcDbPath.toString());
       return false;
     }
 
-    DB level = newLevelDb(srcDbPath);
+    RocksDB rocks = newRocksDb(srcDbPath);
 
     if (this.dstDbPath.toFile().exists()) {
       logger.info(" {} begin to clear exist database directory", this.dbName);
@@ -382,10 +540,10 @@ public class DBConvert implements Callable<Boolean> {
     }
 
     FileUtil.createDirIfNotExists(dstDir);
-    RocksDB rocks = newRocksDb(dstDbPath);
+    DB level = newLevelDb(dstDbPath);
 
     logger.info("Convert database {} start", this.dbName);
-    boolean result  = convertLevelToRocksBatchIterator(level, rocks)
+    boolean result  = convertLevelToRocksBatchIterator(rocks,level)
         && createEngine(dstDbPath.toString());
     long etime = System.currentTimeMillis();
 
