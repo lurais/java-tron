@@ -3,6 +3,7 @@ package org.tron.program;
 import static org.fusesource.leveldbjni.JniDBFactory.factory;
 import static org.lmdbjava.DbiFlags.MDB_CREATE;
 import static org.lmdbjava.PutFlags.MDB_APPEND;
+import static org.tron.keystore.Wallet.generateRandomBytes;
 
 import java.io.File;
 import java.io.IOException;
@@ -319,7 +320,7 @@ public class DBConvert implements Callable<Boolean> {
         byte[] key = rocksIterator.key();
         if (randKeys.size() < 100000 && rand.nextInt(1000) < 10) {
           if(rand.nextInt(100)<10){
-            //randKeys.add(r) 加入随机key
+            randKeys.add(generateRandomBytes(rand.nextInt(100) + 1));
           } else {
             randKeys.add(key);
           }
@@ -365,7 +366,7 @@ public class DBConvert implements Callable<Boolean> {
       return false;
     } finally {
       try {
-        level.close();
+      //  level.close();
       } catch (Exception e1) {
         logger.error("{}", e1);
       }
@@ -382,7 +383,7 @@ public class DBConvert implements Callable<Boolean> {
 
 
     File dbDirectory = new File("./");
-    Env dbEnvironment = Env.create().setMapSize((long)1e9).setMaxDbs(1).open(dbDirectory);
+    Env dbEnvironment = Env.create().setMapSize(50*1024*1024*1024L).setMaxDbs(1).open(dbDirectory);
     //dbEnvironment = Env.create().setMapSize(1_824).setMaxDbs(1).open(dbDirectory);
     Dbi db = dbEnvironment.openDbi(dbName, MDB_CREATE);
 
@@ -423,6 +424,7 @@ public class DBConvert implements Callable<Boolean> {
       return false;
     } finally {
       try {
+        level.close();
         rocks.close();
         JniDBFactory.popMemoryPool();
       } catch (Exception e1) {
@@ -437,8 +439,10 @@ public class DBConvert implements Callable<Boolean> {
       for(byte[] b : randKeys){
         Object v = db.get(txn,toBuffer(b));
       }
+    }finally {
+      dbEnvironment.close();
     }
-    logger.info("random get lmdb end......");
+    logger.info("random get lmdb end......"+checkLmdbOk);
     return checkLmdbOk;
   }
 
