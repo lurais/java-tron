@@ -390,7 +390,7 @@ public class DBConvert implements Callable<Boolean> {
     //lmdb test
     logger.info("write to lmdb begin....");
     try (org.rocksdb.ReadOptions r = new org.rocksdb.ReadOptions().setFillCache(false);
-         RocksIterator rocksIterator = rocks.newIterator(r)) {
+         RocksIterator rocksIterator = rocks.newIterator(r);Txn<ByteBuffer> txn = dbEnvironment.txnWrite()) {
       for (rocksIterator.seekToFirst(); rocksIterator.isValid(); rocksIterator.next()) {
         byte[] key = rocksIterator.key();
         byte[] value = rocksIterator.value();
@@ -401,7 +401,7 @@ public class DBConvert implements Callable<Boolean> {
         values.add(value);
         if (keys.size() >= BATCH) {
           try {
-            write(db,keys,values);
+            write(txn,db,keys,values);
           } catch (Exception e) {
             logger.error("{}", e);
             return false;
@@ -410,12 +410,13 @@ public class DBConvert implements Callable<Boolean> {
       }
       if (!keys.isEmpty()) {
         try {
-          write(db,keys,values);
+          write(txn,db,keys,values);
         } catch (Exception e) {
           logger.error("{}", e);
           return false;
         }
       }
+      txn.commit();
       logger.info("write lmdb end...");
       // check
       check(dbEnvironment,db);
@@ -447,10 +448,11 @@ public class DBConvert implements Callable<Boolean> {
   }
 
 
-  void write(Dbi db, List<byte[]> keys, List<byte[]> values) {
+  void write(Txn<ByteBuffer> txn, Dbi db, List<byte[]> keys,
+             List<byte[]> values) {
     int i=0;
     while(i<keys.size()){
-      db.put(toBuffer(keys.get(i)), toBuffer(values.get(i)));
+      db.put(txn,toBuffer(keys.get(i)), toBuffer(values.get(i)));
       i++;
     }
     keys.clear();
