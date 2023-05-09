@@ -389,7 +389,7 @@ public class DBConvert implements Callable<Boolean> {
 
     Env seqDbEnvironment = Env.create().setMapSize(50*1024*1024*1024L).setMaxDbs(1).open(new File("./lsq/"));
     //dbEnvironment = Env.create().setMapSize(1_824).setMaxDbs(1).open(dbDirectory);
-    Dbi seqDb = dbEnvironment.openDbi(dbName, MDB_CREATE);
+    Dbi seqDb = seqDbEnvironment.openDbi(dbName, MDB_CREATE);
 
     //lmdb test
     logger.info("write to lmdb begin....");
@@ -456,10 +456,16 @@ public class DBConvert implements Callable<Boolean> {
   }
 
   private void writeToLmdb(Env dbEnvironment, Dbi db, Env seqDbEnvironment, Dbi seqDb) {
-    try (Txn<ByteBuffer> txn = dbEnvironment.txnWrite();Txn<ByteBuffer> txnSeq = seqDbEnvironment.txnWrite();) {
+    final PutFlags flags = MDB_APPEND;
+    try (Txn<ByteBuffer> txn = dbEnvironment.txnWrite();Txn<ByteBuffer> txnSeq = seqDbEnvironment.txnWrite();
+    Cursor<ByteBuffer> seqC = seqDb.openCursor(txnSeq)) {
       try (CursorIterable<ByteBuffer> ci = db.iterate(txn, KeyRange.all())) {
         for (final CursorIterable.KeyVal<ByteBuffer> kv : ci) {
-          seqDb.put(txnSeq,kv.key(),kv.val());
+          ByteBuffer key = kv.key();
+          ByteBuffer val = kv.val();
+          key.flip();
+          val.flip();
+          seqC.put(key,val,flags);
         }
       }
       txn.commit();

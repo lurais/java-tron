@@ -30,7 +30,7 @@
 //
 //  public void seek(byte[] key) {
 //    try {
-//      cursorIterable=cursorIterable..;
+//      cursorIterable=cursorIterable.iterator();
 //    } catch (NativeDB.DBException e) {
 //      if( e.isNotFound() ) {
 //        throw new NoSuchElementException();
