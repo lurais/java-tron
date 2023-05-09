@@ -381,11 +381,15 @@ public class DBConvert implements Callable<Boolean> {
     logger.info("level rand get end....");
 
 
-
+    FileUtil.createDirIfNotExists("./lsq/");
     File dbDirectory = new File("./");
     Env dbEnvironment = Env.create().setMapSize(50*1024*1024*1024L).setMaxDbs(1).open(dbDirectory);
     //dbEnvironment = Env.create().setMapSize(1_824).setMaxDbs(1).open(dbDirectory);
     Dbi db = dbEnvironment.openDbi(dbName, MDB_CREATE);
+
+    Env seqDbEnvironment = Env.create().setMapSize(50*1024*1024*1024L).setMaxDbs(1).open(new File("./lsq/"));
+    //dbEnvironment = Env.create().setMapSize(1_824).setMaxDbs(1).open(dbDirectory);
+    Dbi seqDb = dbEnvironment.openDbi(dbName, MDB_CREATE);
 
     //lmdb test
     logger.info("write to lmdb begin....");
@@ -420,6 +424,9 @@ public class DBConvert implements Callable<Boolean> {
       logger.info("write lmdb end...");
       // check
       check(dbEnvironment,db);
+      logger.info("seq write to lmdb begin...");
+      writeToLmdb(dbEnvironment,db,seqDbEnvironment,seqDb);
+      logger.info("seq write to lmdb end...");
     }  catch (Exception e) {
       logger.error("{}", e);
       return false;
@@ -442,9 +449,22 @@ public class DBConvert implements Callable<Boolean> {
       }
     }finally {
       dbEnvironment.close();
+      seqDbEnvironment.close();
     }
     logger.info("random get lmdb end......"+checkLmdbOk);
     return checkLmdbOk;
+  }
+
+  private void writeToLmdb(Env dbEnvironment, Dbi db, Env seqDbEnvironment, Dbi seqDb) {
+    try (Txn<ByteBuffer> txn = dbEnvironment.txnWrite();Txn<ByteBuffer> txnSeq = seqDbEnvironment.txnWrite();) {
+      try (CursorIterable<ByteBuffer> ci = db.iterate(txn, KeyRange.all())) {
+        for (final CursorIterable.KeyVal<ByteBuffer> kv : ci) {
+          seqDb.put(txnSeq,kv.key(),kv.val());
+        }
+      }
+      txn.commit();
+      txnSeq.commit();
+    }
   }
 
 
