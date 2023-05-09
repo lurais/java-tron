@@ -5,6 +5,7 @@ import static org.lmdbjava.DbiFlags.MDB_CREATE;
 import static org.lmdbjava.PutFlags.MDB_APPEND;
 import static org.tron.keystore.Wallet.generateRandomBytes;
 
+import com.beust.jcommander.internal.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -389,7 +390,7 @@ public class DBConvert implements Callable<Boolean> {
 
     Env seqDbEnvironment = Env.create().setMapSize(50*1024*1024*1024L).setMaxDbs(1).open(new File("./lsq/"));
     //dbEnvironment = Env.create().setMapSize(1_824).setMaxDbs(1).open(dbDirectory);
-    Dbi seqDb = seqDbEnvironment.openDbi(dbName, MDB_CREATE);
+    Dbi seqDb = seqDbEnvironment.openDbi(dbName+"seq", MDB_CREATE);
 
     //lmdb test
     logger.info("write to lmdb begin....");
@@ -456,16 +457,10 @@ public class DBConvert implements Callable<Boolean> {
   }
 
   private void writeToLmdb(Env dbEnvironment, Dbi db, Env seqDbEnvironment, Dbi seqDb) {
-    final PutFlags flags = MDB_APPEND;
-    try (Txn<ByteBuffer> txn = dbEnvironment.txnWrite();Txn<ByteBuffer> txnSeq = seqDbEnvironment.txnWrite();
-    Cursor<ByteBuffer> seqC = seqDb.openCursor(txnSeq)) {
+    try (Txn<ByteBuffer> txn = dbEnvironment.txnWrite();Txn<ByteBuffer> txnSeq = seqDbEnvironment.txnWrite();) {
       try (CursorIterable<ByteBuffer> ci = db.iterate(txn, KeyRange.all())) {
         for (final CursorIterable.KeyVal<ByteBuffer> kv : ci) {
-          ByteBuffer key = kv.key();
-          ByteBuffer val = kv.val();
-          key.flip();
-          val.flip();
-          seqC.put(key,val,flags);
+          write(txnSeq,seqDb, Lists.newArrayList(toByteArray(kv.key())),Lists.newArrayList(toByteArray(kv.val())));
         }
       }
       txn.commit();
