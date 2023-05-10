@@ -8,20 +8,27 @@
 //import org.fusesource.leveldbjni.internal.NativeDB;
 //import org.fusesource.leveldbjni.internal.NativeIterator;
 //import org.lmdbjava.CursorIterable;
+//import org.lmdbjava.Dbi;
+//import org.lmdbjava.Env;
+//import org.lmdbjava.KeyRange;
+//import org.lmdbjava.Txn;
+//import org.tron.common.utils.ByteBufferUtil;
 //import org.tron.core.db.common.iterator.DBIterator;
 //
 //public class LmDBIterator implements DBIterator {
 //
-//  private final Iterator<CursorIterable.KeyVal<?>> iterator;
-//  private final CursorIterable cursorIterable;
+//  private  Dbi<ByteBuffer> db = null;
+//  private  CursorIterable<ByteBuffer> ci = null;
+//  private Txn<ByteBuffer> txn = null;
 //
-//  LmDBIterator(CursorIterable cursorIterable) {
+//  LmDBIterator(CursorIterable cursorIterable, Dbi dbi, Env env) {
 //    cursorIterable = cursorIterable;
-//    iterator = cursorIterable.iterator();
+//    db = dbi;
+//    txn = env
 //  }
 //
 //  public void close() {
-//    cursorIterable.close();
+//    ci.close();
 //  }
 //
 //  public void remove() {
@@ -30,7 +37,8 @@
 //
 //  public void seek(byte[] key) {
 //    try {
-//      cursorIterable=cursorIterable.iterator();
+//      final KeyRange<ByteBuffer> range = KeyRange.atLeast(ByteBufferUtil.toBuffer(key));
+//      ci = db.iterate(null,range);
 //    } catch (NativeDB.DBException e) {
 //      if( e.isNotFound() ) {
 //        throw new NoSuchElementException();

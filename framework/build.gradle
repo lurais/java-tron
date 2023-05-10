@@ -72,7 +72,8 @@ dependencies {
     compile 'com.googlecode.cqengine:cqengine:2.12.4'
     compile group: 'com.google.api.grpc', name: 'googleapis-common-protos', version: '0.0.3'
 
-    compile 'org.lmdbjava:lmdbjava:0.8.3'
+    compile 'org.lmdbjava:lmdbjava:0.8.1'
+    compile 'org.agrona:agrona:1.5.1'
 
     // http
     compile 'org.eclipse.jetty:jetty-server:9.4.49.v20220914'

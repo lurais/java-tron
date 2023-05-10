@@ -105,6 +105,13 @@ public class DBConvert implements Callable<Boolean> {
   }
 
   public static void main(String[] args) {
+//    RwTest rwTest = new RwTest();
+//    try {
+//      rwTest.lmTest();
+//      rwTest.lmRandTest();
+//    }catch(Exception e){
+//      logger.info("test error:",e);
+//    }
     int code = run(args);
     logger.info("exit code {}.", code);
     System.out.printf("exit code %d.\n", code);
@@ -310,16 +317,20 @@ public class DBConvert implements Callable<Boolean> {
     // convert
     List<byte[]> keys = new ArrayList<>(BATCH);
     List<byte[]> values = new ArrayList<>(BATCH);
-    List<byte[]> randKeys = new ArrayList<>(100000);
+    List<byte[]> randKeys = new ArrayList<>(10000);
     JniDBFactory.pushMemoryPool(1024 * 1024);
 
     //init randkeys
+    int count = 1000000;
     Random rand = new Random(System.currentTimeMillis());
     try (org.rocksdb.ReadOptions r = new org.rocksdb.ReadOptions().setFillCache(false);
          RocksIterator rocksIterator = rocks.newIterator(r)) {
       for (rocksIterator.seekToFirst(); rocksIterator.isValid(); rocksIterator.next()) {
+        if(count--<=0){
+          break;
+        }
         byte[] key = rocksIterator.key();
-        if (randKeys.size() < 100000 && rand.nextInt(1000) < 10) {
+        if (randKeys.size() < 10000 && rand.nextInt(100) < 10) {
           if(rand.nextInt(100)<10){
             randKeys.add(generateRandomBytes(rand.nextInt(100) + 1));
           } else {
@@ -332,9 +343,13 @@ public class DBConvert implements Callable<Boolean> {
 
     logger.info("seq write level begin.....");
     // level test
+    count = 1000000;
     try (org.rocksdb.ReadOptions r = new org.rocksdb.ReadOptions().setFillCache(false);
          RocksIterator rocksIterator = rocks.newIterator(r)) {
       for (rocksIterator.seekToFirst(); rocksIterator.isValid(); rocksIterator.next()) {
+        if(count<=0){
+          break;
+        }
         byte[] key = rocksIterator.key();
         byte[] value = rocksIterator.value();
         srcDbKeyCount++;
@@ -345,6 +360,7 @@ public class DBConvert implements Callable<Boolean> {
         if (keys.size() >= BATCH) {
           try {
             batchInsert(level, keys, values);
+            count-=keys.size();
           } catch (Exception e) {
             logger.error("{}", e);
             return false;
@@ -393,10 +409,14 @@ public class DBConvert implements Callable<Boolean> {
     Dbi seqDb = seqDbEnvironment.openDbi(dbName+"seq", MDB_CREATE);
 
     //lmdb test
+    count = 1000000;
     logger.info("write to lmdb begin....");
     try (org.rocksdb.ReadOptions r = new org.rocksdb.ReadOptions().setFillCache(false);
          RocksIterator rocksIterator = rocks.newIterator(r);Txn<ByteBuffer> txn = dbEnvironment.txnWrite()) {
       for (rocksIterator.seekToFirst(); rocksIterator.isValid(); rocksIterator.next()) {
+        if(count <= 0){
+          break;
+        }
         byte[] key = rocksIterator.key();
         byte[] value = rocksIterator.value();
         srcDbKeyCount++;
@@ -407,6 +427,7 @@ public class DBConvert implements Callable<Boolean> {
         if (keys.size() >= BATCH) {
           try {
             write(txn,db,keys,values);
+            count-=keys.size();
           } catch (Exception e) {
             logger.error("{}", e);
             return false;
@@ -444,7 +465,7 @@ public class DBConvert implements Callable<Boolean> {
         && dstDbValueSum == srcDbValueSum;
     // random get
     logger.info("random get lmdb begin....");
-    try (Txn<ByteBuffer> txn = dbEnvironment.txnWrite()) {
+    try (Txn<ByteBuffer> txn = dbEnvironment.txnRead()) {
       for(byte[] b : randKeys){
         Object v = db.get(txn,toBuffer(b));
       }

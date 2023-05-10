@@ -42,7 +42,6 @@ import org.iq80.leveldb.DBIterator;
 import org.iq80.leveldb.Options;
 import org.iq80.leveldb.WriteBatch;
 import org.junit.Assert;
-import org.junit.Test;
 import org.lmdbjava.BufferProxy;
 import org.lmdbjava.Cursor;
 import org.lmdbjava.CursorIterable;
@@ -56,7 +55,7 @@ import org.lmdbjava.Txn;
 import org.tron.common.utils.FileUtil;
 
 @Slf4j
-public class LmdbTest {
+public class RwTest {
 
   private String dbName;
   private Env<ByteBuffer> dbEnvironment;
@@ -68,7 +67,7 @@ public class LmdbTest {
   BufferProxy<ByteBuffer> bufferProxy;
   Dbi<ByteBuffer> db = null;
   Env<ByteBuffer> env;
-  int num = 1000000;
+  int num = 10000000;
   int valSize = 100;
   static final int POSIX_MODE = 664;
   boolean intKey = false;
@@ -82,20 +81,18 @@ public class LmdbTest {
   ByteBuffer rwVal;
   Cursor<ByteBuffer> c;
   Txn<ByteBuffer> txn;
-  List<byte[]> randLmList = new ArrayList<>(1000);
+  List<byte[]> randLmList = new ArrayList<>(50000);
 
   //leveldb
   DB leveldb = null;
   MutableDirectBuffer wkb;
   MutableDirectBuffer wvb;
-  List<byte[]> randLevelList = new ArrayList<>(1000);
+  List<byte[]> randLevelList = new ArrayList<>(50000);
 
   static {
     setProperty(DISABLE_CHECKS_PROP, TRUE.toString());
   }
 
-
-  @Test
   public void lmTest() throws IOException {
     String dir = "/tmp/test/" + System.currentTimeMillis();
     FileUtil.createDirIfNotExists(dir);
@@ -110,14 +107,14 @@ public class LmdbTest {
     long writeToLevelEnd = System.currentTimeMillis();
     readLevel();
     long readLevelEnd = System.currentTimeMillis();
-    System.out.println("write to lm end, cost:"+ (writeLmEnd-writeLmStart)
+    logger.info("write to lm end, cost:"+ (writeLmEnd-writeLmStart)
         + " read lm cost:"+(readLmEnd -writeLmEnd)
         +", write to level cost:"+(writeToLevelEnd-readLmEnd)
-    +", read level cost:"+(readLevelEnd-writeToLevelEnd));
+        +", read level cost:"+(readLevelEnd-writeToLevelEnd));
     // writeLevel();
   }
 
-  @Test
+
   public void lmRandTest() throws IOException {
     String dir = "/tmp/test/" + System.currentTimeMillis();
     FileUtil.createDirIfNotExists(dir);
@@ -134,7 +131,7 @@ public class LmdbTest {
     long writeToLevelEnd = System.currentTimeMillis();
     readLevelRand();
     long readLevelEnd = System.currentTimeMillis();
-    System.out.println("write to lm end, cost:"+ (writeLmEnd-writeLmStart)
+    logger.info("write to lm end, cost:"+ (writeLmEnd-writeLmStart)
         + " read lm cost:"+(readLmEnd -writeLmEnd)
         +", write to level cost:"+(writeToLevelEnd-readLmEnd)
         +", read level cost:"+(readLevelEnd-writeToLevelEnd));
@@ -294,16 +291,16 @@ public class LmdbTest {
       try (Cursor<ByteBuffer> c = db.openCursor(tx);) {
         final PutFlags flags = null;
         while(count-->0) {
-            byte[] key = generateRandomBytes(r.nextInt(100) + 1);
-            byte[] value = generateRandomBytes(r.nextInt(100) + 1);
-            if(randLmList.size()<10000 && r.nextInt(1000)<50){
-              randLmList.add(key);
-            }
-            rwKey.clear();
-            rwVal.clear();
-            rwKey.put(key).flip();
-            rwVal.put(value).flip();
-            c.put(rwKey, rwVal, flags);
+          byte[] key = generateRandomBytes(r.nextInt(100) + 1);
+          byte[] value = generateRandomBytes(r.nextInt(100) + 1);
+          if(randLmList.size()<1000 && r.nextInt(1000)<5){
+            randLmList.add(key);
+          }
+          rwKey.clear();
+          rwVal.clear();
+          rwKey.put(key).flip();
+          rwVal.put(value).flip();
+          c.put(rwKey, rwVal, flags);
         }
       }
       tx.commit();
@@ -346,14 +343,14 @@ public class LmdbTest {
     Random r = new Random(System.currentTimeMillis());
     int rndByteOffset = 0;
     WriteBatch batch = leveldb.createWriteBatch();
-  int i = 0;
-  int count = num;
-   while(count-->0){
-     byte[] key = generateRandomBytes(r.nextInt(100) + 1);
-     byte[] value = generateRandomBytes(r.nextInt(1000) + 1);
-     if(randLevelList.size()<10000 && r.nextInt(1000)<50){
-       randLevelList.add(key);
-     }
+    int i = 0;
+    int count = num;
+    while(count-->0){
+      byte[] key = generateRandomBytes(r.nextInt(100) + 1);
+      byte[] value = generateRandomBytes(r.nextInt(1000) + 1);
+      if(randLevelList.size()<1000 && r.nextInt(1000)<5){
+        randLevelList.add(key);
+      }
       batch.put(key, value);
       i++;
       if (i % batchSize == 0) {
@@ -376,7 +373,7 @@ public class LmdbTest {
     return "0000000000000000".substring(0, 16 - skey.length()) + skey;
   }
 
-  @Test
+
   public void lmdbTest() throws IOException {
     String dir = "/tmp/test/" + System.currentTimeMillis();
     FileUtil.createDirIfNotExists(dir);
@@ -518,5 +515,4 @@ public class LmdbTest {
     }
     return currentSum;
   }
-
 }
