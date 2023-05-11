@@ -75,7 +75,7 @@ public class DBConvert implements Callable<Boolean> {
   private static final int CPUS  = Runtime.getRuntime().availableProcessors();
   private static final int BATCH  = 256;
   private static final String CHECKPOINT_V2_DIR_NAME = "checkpoint";
-  private int keyCount = 10000000;
+  private int keyCount = 1000000;
 
 
   @Override
