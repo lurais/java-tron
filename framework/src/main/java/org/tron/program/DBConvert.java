@@ -75,6 +75,7 @@ public class DBConvert implements Callable<Boolean> {
   private static final int CPUS  = Runtime.getRuntime().availableProcessors();
   private static final int BATCH  = 256;
   private static final String CHECKPOINT_V2_DIR_NAME = "checkpoint";
+  private int keyCount = 10000000;
 
 
   @Override
@@ -321,7 +322,7 @@ public class DBConvert implements Callable<Boolean> {
     JniDBFactory.pushMemoryPool(1024 * 1024);
 
     //init randkeys
-    int count = 1000000;
+    int count = keyCount;
     Random rand = new Random(System.currentTimeMillis());
     try (org.rocksdb.ReadOptions r = new org.rocksdb.ReadOptions().setFillCache(false);
          RocksIterator rocksIterator = rocks.newIterator(r)) {
@@ -330,7 +331,7 @@ public class DBConvert implements Callable<Boolean> {
           break;
         }
         byte[] key = rocksIterator.key();
-        if (randKeys.size() < 10000 && rand.nextInt(100) < 10) {
+        if (randKeys.size() < (keyCount/100) && rand.nextInt(100) < 3) {
           if(rand.nextInt(100)<10){
             randKeys.add(generateRandomBytes(rand.nextInt(100) + 1));
           } else {
@@ -343,7 +344,7 @@ public class DBConvert implements Callable<Boolean> {
 
     logger.info("seq write level begin.....");
     // level test
-    count = 1000000;
+    count = keyCount;
     try (org.rocksdb.ReadOptions r = new org.rocksdb.ReadOptions().setFillCache(false);
          RocksIterator rocksIterator = rocks.newIterator(r)) {
       for (rocksIterator.seekToFirst(); rocksIterator.isValid(); rocksIterator.next()) {
@@ -359,8 +360,8 @@ public class DBConvert implements Callable<Boolean> {
         values.add(value);
         if (keys.size() >= BATCH) {
           try {
-            batchInsert(level, keys, values);
             count-=keys.size();
+            batchInsert(level, keys, values);
           } catch (Exception e) {
             logger.error("{}", e);
             return false;
@@ -409,7 +410,7 @@ public class DBConvert implements Callable<Boolean> {
     Dbi seqDb = seqDbEnvironment.openDbi(dbName+"seq", MDB_CREATE);
 
     //lmdb test
-    count = 1000000;
+    count = keyCount;
     logger.info("write to lmdb begin....");
     try (org.rocksdb.ReadOptions r = new org.rocksdb.ReadOptions().setFillCache(false);
          RocksIterator rocksIterator = rocks.newIterator(r);Txn<ByteBuffer> txn = dbEnvironment.txnWrite()) {
@@ -426,8 +427,8 @@ public class DBConvert implements Callable<Boolean> {
         values.add(value);
         if (keys.size() >= BATCH) {
           try {
-            write(txn,db,keys,values);
             count-=keys.size();
+            write(txn,db,keys,values);
           } catch (Exception e) {
             logger.error("{}", e);
             return false;
