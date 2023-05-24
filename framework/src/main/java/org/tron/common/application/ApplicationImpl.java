@@ -1,11 +1,19 @@
 package org.tron.common.application;
 
+import java.util.Iterator;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.bouncycastle.util.encoders.Hex;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationListener;
+import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.stereotype.Component;
 import org.tron.common.logsfilter.EventPluginLoader;
 import org.tron.common.parameter.CommonParameter;
 import org.tron.core.ChainBaseManager;
+import org.tron.core.capsule.AccountCapsule;
+import org.tron.core.capsule.BytesCapsule;
+import org.tron.core.capsule.VotesCapsule;
 import org.tron.core.config.args.Args;
 import org.tron.core.config.args.DynamicArgs;
 import org.tron.core.consensus.ConsensusService;
@@ -17,7 +25,7 @@ import org.tron.program.SolidityNode;
 
 @Slf4j(topic = "app")
 @Component
-public class ApplicationImpl implements Application {
+public class ApplicationImpl implements Application, ApplicationListener<ContextRefreshedEvent> {
 
   private ServiceContainer services;
 
@@ -118,5 +126,34 @@ public class ApplicationImpl implements Application {
   private void closeAllStore() {
     dbManager.closeAllStore();
   }
+
+  @Override
+  public void onApplicationEvent(ContextRefreshedEvent event) {
+    //遍历account库
+    statAccountStake();
+  }
+
+  private void statAccountStake() {
+    //仅统计老质押模型的质押情况
+    logger.info("statAccountStake begin,iterCount=" + 0);
+    long iterCount = 0;
+    long newAlgorithmCycle = chainBaseManager.getDynamicPropertiesStore().getNewRewardAlgorithmEffectiveCycle();
+    for (Map.Entry<byte[], AccountCapsule> entry : chainBaseManager.getAccountStore()) {
+      iterCount++;
+      long beginCycle = chainBaseManager.getDelegationStore().getBeginCycle(entry.getKey());
+      if (beginCycle > 0 && beginCycle < newAlgorithmCycle) {
+        logStakeOld(entry.getValue(), newAlgorithmCycle - beginCycle);
+      }
+    }
+    logger.info("statAccountStake end,iterCount=" + iterCount);
+  }
+
+  private void logStakeOld(AccountCapsule accountCapsule, long cycleDiff) {
+    String sb = "statAccountStake account:" + accountCapsule.createReadableString() +
+        " cycleDiff:" + cycleDiff +
+        " frozenBalance:" + accountCapsule.getFrozenBalance();
+    logger.info(sb);
+  }
+
 
 }

@@ -80,6 +80,45 @@ public class MortgageService {
     adjustAllowance(witnessAddress, brokerageAmount);
   }
 
+  public boolean withdrawOld(byte[] address){
+    if (!dynamicPropertiesStore.allowChangeDelegation()) {
+      return false;
+    }
+    AccountCapsule accountCapsule = accountStore.get(address);
+    long beginCycle = delegationStore.getBeginCycle(address);
+    long endCycle = delegationStore.getEndCycle(address);
+    long currentCycle = dynamicPropertiesStore.getCurrentCycleNumber();
+    long newAlgorithmCycle = dynamicPropertiesStore.getNewRewardAlgorithmEffectiveCycle();
+    long reward = 0;
+
+    //withdraw the latest cycle reward
+    if (beginCycle + 1 == endCycle && beginCycle < currentCycle) {
+      AccountCapsule account = delegationStore.getAccountVote(beginCycle, address);
+      if (account != null) {
+        reward = computeReward(beginCycle, endCycle, account);
+        adjustAllowance(address, reward);
+        reward = 0;
+        logger.info("Latest cycle reward {}, {}.", beginCycle, account.getVotesList());
+      }
+      beginCycle += 1;
+    }
+    //
+    endCycle = currentCycle;
+    if (CollectionUtils.isEmpty(accountCapsule.getVotesList())) {
+      delegationStore.setBeginCycle(address, endCycle + 1);
+      return false;
+    }
+    if (beginCycle >= endCycle) {
+      return false;
+    }
+
+    if (beginCycle < newAlgorithmCycle) {
+      return true;
+    }
+    return false;
+  }
+
+
   public void withdrawReward(byte[] address) {
     if (!dynamicPropertiesStore.allowChangeDelegation()) {
       return;
