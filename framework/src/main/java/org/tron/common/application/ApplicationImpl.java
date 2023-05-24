@@ -141,16 +141,19 @@ public class ApplicationImpl implements Application, ApplicationListener<Context
     for (Map.Entry<byte[], AccountCapsule> entry : chainBaseManager.getAccountStore()) {
       iterCount++;
       long beginCycle = chainBaseManager.getDelegationStore().getBeginCycle(entry.getKey());
+      long endCycle = chainBaseManager.getDelegationStore().getEndCycle(entry.getKey());
       if (beginCycle > 0 && beginCycle < newAlgorithmCycle) {
-        logStakeOld(entry.getValue(), newAlgorithmCycle - beginCycle);
+        logStakeOld(entry.getValue(),  beginCycle,endCycle);
       }
     }
     logger.info("statAccountStake end,iterCount=" + iterCount);
   }
 
-  private void logStakeOld(AccountCapsule accountCapsule, long cycleDiff) {
+  private void logStakeOld(AccountCapsule accountCapsule, long beginCycle, long endCycle) {
     String sb = "statAccountStake account:" + accountCapsule.createReadableString() +
-        " cycleDiff:" + cycleDiff +
+        " beginCycle:" + beginCycle +
+        " endCycle:" + endCycle +
+        " voteListSize:" + accountCapsule.getVotesList().size() +
         " frozenBalance:" + accountCapsule.getFrozenBalance();
     logger.info(sb);
   }
