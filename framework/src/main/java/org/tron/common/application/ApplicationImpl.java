@@ -4,6 +4,7 @@ import java.text.ParseException;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.time.DateFormatUtils;
 import org.apache.commons.lang3.time.DateUtils;
@@ -12,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
 import org.tron.common.logsfilter.EventPluginLoader;
 import org.tron.common.parameter.CommonParameter;
 import org.tron.core.ChainBaseManager;
@@ -147,18 +149,28 @@ public class ApplicationImpl implements Application, ApplicationListener<Context
       iterCount++;
       long beginCycle = chainBaseManager.getDelegationStore().getBeginCycle(entry.getKey());
       long endCycle = chainBaseManager.getDelegationStore().getEndCycle(entry.getKey());
-      if (beginCycle > 0 && beginCycle < newAlgorithmCycle) {
+      if (beginCycle > 0 && beginCycle < newAlgorithmCycle && fitOld(beginCycle,endCycle,entry.getKey(),entry.getValue())) {
         logStakeOld(entry.getValue(),  beginCycle,endCycle);
       }
     }
     logger.info("statAccountStake end,iterCount=" + iterCount);
   }
 
+  private boolean fitOld(long beginCycle, long endCycle, byte[] address, AccountCapsule accountCapsule) {
+    if(beginCycle+1==endCycle && Objects.nonNull(chainBaseManager.getDelegationStore().getAccountVote(beginCycle, address))){
+      return true;
+    }
+    if(!CollectionUtils.isEmpty(accountCapsule.getVotesList())){
+      return true;
+    }
+    return false;
+  }
+
   private void logStakeOld(AccountCapsule accountCapsule, long beginCycle, long endCycle) {
     String sb = "statAccountStake account:" + accountCapsule.createReadableString() +
         " beginCycle:" + parseTime(beginCycle) +
 //        " endCycle:" + endCycle +
-        " voteListSize:" + accountCapsule.getVotesList().size() +
+//        " voteListSize:" + accountCapsule.getVotesList().size() +
         " frozenBalance:" + accountCapsule.getFrozenBalance();
     logger.info(sb);
   }
