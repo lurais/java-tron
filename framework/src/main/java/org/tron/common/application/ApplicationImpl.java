@@ -149,7 +149,7 @@ public class ApplicationImpl implements Application, ApplicationListener<Context
       iterCount++;
       long beginCycle = chainBaseManager.getDelegationStore().getBeginCycle(entry.getKey());
       long endCycle = chainBaseManager.getDelegationStore().getEndCycle(entry.getKey());
-      if (beginCycle > 0 && beginCycle < newAlgorithmCycle && fitOld(beginCycle,endCycle,entry.getKey(),entry.getValue())) {
+      if (beginCycle >= 0 && beginCycle < newAlgorithmCycle && fitOld(beginCycle,endCycle,entry.getKey(),entry.getValue())) {
         logStakeOld(entry.getValue(),  beginCycle,endCycle);
       }
     }

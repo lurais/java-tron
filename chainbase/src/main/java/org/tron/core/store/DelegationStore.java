@@ -58,7 +58,7 @@ public class DelegationStore extends TronStoreWithRevoking<BytesCapsule> {
 
   public long getBeginCycle(byte[] address) {
     BytesCapsule bytesCapsule = get(address);
-    return bytesCapsule == null ? 0 : ByteArray.toLong(bytesCapsule.getData());
+    return bytesCapsule == null ? -1 : ByteArray.toLong(bytesCapsule.getData());
   }
 
   public void setEndCycle(byte[] address, long number) {
