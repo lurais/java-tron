@@ -1,8 +1,12 @@
 package org.tron.common.application;
 
+import java.text.ParseException;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.time.DateFormatUtils;
+import org.apache.commons.lang3.time.DateUtils;
 import org.bouncycastle.util.encoders.Hex;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationListener;
@@ -152,11 +156,22 @@ public class ApplicationImpl implements Application, ApplicationListener<Context
 
   private void logStakeOld(AccountCapsule accountCapsule, long beginCycle, long endCycle) {
     String sb = "statAccountStake account:" + accountCapsule.createReadableString() +
-        " beginCycle:" + beginCycle +
-        " endCycle:" + endCycle +
+        " beginCycle:" + parseTime(beginCycle) +
+//        " endCycle:" + endCycle +
         " voteListSize:" + accountCapsule.getVotesList().size() +
         " frozenBalance:" + accountCapsule.getFrozenBalance();
     logger.info(sb);
+  }
+
+  private String parseTime(long beginCycle) {
+    Date origin = null;
+    try {
+      origin = DateUtils.parseDate("2019-10-31 20:00:00","yyyy-MM-dd HH:mm:ss");
+    } catch (ParseException e) {
+      e.printStackTrace();
+    }
+    Date date = DateUtils.addHours(origin,Integer.parseInt(beginCycle+"")*6);
+    return DateFormatUtils.format(date,"yyyy-MM-dd HH:mm:ss");
   }
 
 
