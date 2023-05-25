@@ -138,6 +138,7 @@ public class ApplicationImpl implements Application, ApplicationListener<Context
     logger.info("statAccountStake begin,iterCount=" + 0);
     long iterCount = 0;
     long newAlgorithmCycle = chainBaseManager.getDynamicPropertiesStore().getNewRewardAlgorithmEffectiveCycle();
+    logger.info("statAccountStake begin,newAlgorithmCycle="+newAlgorithmCycle);
     for (Map.Entry<byte[], AccountCapsule> entry : chainBaseManager.getAccountStore()) {
       iterCount++;
       long beginCycle = chainBaseManager.getDelegationStore().getBeginCycle(entry.getKey());
