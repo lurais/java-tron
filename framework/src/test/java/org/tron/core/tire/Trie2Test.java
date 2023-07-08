@@ -21,6 +21,7 @@ package org.tron.core.tire;
 import static org.tron.core.state.WorldStateCallBack.fix32;
 import static org.tron.core.state.WorldStateQueryInstance.ADDRESS_SIZE;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
@@ -44,13 +45,17 @@ import org.hyperledger.besu.storage.KeyValueStorage;
 import org.hyperledger.besu.storage.RocksDBConfiguration;
 import org.hyperledger.besu.storage.RocksDBConfigurationBuilder;
 import org.hyperledger.besu.storage.RocksDBKeyValueStorage;
+import org.iq80.leveldb.DBIterator;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.tron.common.utils.ByteArray;
+import org.tron.core.db2.common.DB;
 import org.tron.core.state.StateType;
 import org.tron.core.state.trie.TrieImpl2;
+import static org.fusesource.leveldbjni.JniDBFactory.factory;
+import static org.tron.program.DBConvert.newDefaultLevelDbOptions;
 
 public class Trie2Test {
 
@@ -81,6 +86,29 @@ public class Trie2Test {
   @Test
   public void test() {
     TrieImpl2 trie = new TrieImpl2(createStore());
+    File file = new File("/Users/penghuan/runtime/tron/tov/output-directory/database/account");
+    File file2 = new File("/Users/penghuan/runtime/tron/tov/output-directory/database/account2");
+
+    org.iq80.leveldb.DB acc = null;
+    org.iq80.leveldb.DB acc2 = null;
+
+    try {
+      acc = factory.open(file,newDefaultLevelDbOptions());
+      acc2 = factory.open(file2,newDefaultLevelDbOptions());
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    DBIterator iterator = acc.iterator();
+    iterator.seekToFirst();
+    int limit = 1000000;
+    while(iterator.hasNext()&&limit-->0){
+      Map.Entry entry = iterator.next();
+      acc2.put((byte[]) entry.getKey(),(byte[]) entry.getValue());
+      trie.put(Bytes.wrap((byte[]) entry.getKey()),Bytes.wrap((byte[]) entry.getValue()));
+      trie.commit();
+    }
+
+
     trie.put(Bytes.of(1), c);
     Assert.assertEquals(trie.get(new byte[]{1}), c);
     trie.put(Bytes.of(1, 0), ca);

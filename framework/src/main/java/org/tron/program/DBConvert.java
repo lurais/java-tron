@@ -3,6 +3,7 @@ package org.tron.program;
 import static org.fusesource.leveldbjni.JniDBFactory.factory;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -19,6 +20,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.tuweni.bytes.Bytes;
 import org.fusesource.leveldbjni.JniDBFactory;
 import org.iq80.leveldb.CompressionType;
 import org.iq80.leveldb.DB;
@@ -35,6 +37,7 @@ import org.tron.common.utils.FileUtil;
 import org.tron.common.utils.MarketOrderPriceComparatorForLevelDB;
 import org.tron.common.utils.MarketOrderPriceComparatorForRockDB;
 import org.tron.common.utils.PropUtil;
+import org.tron.core.state.trie.TrieImpl2;
 
 @Slf4j
 public class DBConvert implements Callable<Boolean> {
@@ -89,10 +92,41 @@ public class DBConvert implements Callable<Boolean> {
   }
 
   public static void main(String[] args) {
-    int code = run(args);
+    testTrie();
+    //int code = run(args);
+    int code = 0;
     logger.info("exit code {}.", code);
     System.out.printf("exit code %d.\n", code);
     System.exit(code);
+  }
+
+  private static void testTrie() {
+    TrieImpl2 trie = new TrieImpl2("/Users/penghuan/runtime/tron/tov/output-directory/database/testTrie");
+    File file = new File("/Users/penghuan/runtime/tron/tov/output-directory/database/account");
+    File file2 = new File("/Users/penghuan/runtime/tron/tov/output-directory/database/account2");
+
+    org.iq80.leveldb.DB acc = null;
+    org.iq80.leveldb.DB acc2 = null;
+
+    try {
+      acc = factory.open(file,newDefaultLevelDbOptions());
+      acc2 = factory.open(file2,newDefaultLevelDbOptions());
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    DBIterator iterator = acc.iterator();
+    iterator.seekToFirst();
+    int limit = 1000000;
+    while(iterator.hasNext()&&limit-->0){
+      Map.Entry entry = iterator.next();
+      acc2.put((byte[]) entry.getKey(),(byte[]) entry.getValue());
+      trie.put(Bytes.wrap((byte[]) entry.getKey()),Bytes.wrap((byte[]) entry.getValue()));
+      trie.commit();
+      if((1000000-limit)%100==0) {
+        trie.flush();
+      }
+    }
+    System.out.println("finish write:"+limit);
   }
 
   public static int run(String[] args) {

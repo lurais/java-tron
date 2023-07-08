@@ -6,9 +6,18 @@ import lombok.Getter;
 
 public enum StateType {
 
+  //1.先测试不压缩
+  // 写入trie   mdb ,       索引写入(搞索引结构)，
+  // 21年交易：litenode 写trie 预计一天30g
+  // mdb kv 几次put 目标熟悉erigon 写入逻辑，业务构造写入，需要多久 （和erigon 一致）
+  // changeset 方式写入
+  // 可能影响：erigon自身针对字段压缩，java go版本mdb差异(数据占用对比)，
+  // java调用go 还是直接使用java版，java版对比实际存储差异，java go 按接口 采用erigon db测试方案，lmdb-java方案
+  // 数据跑多久，机器配置？几台机器？
+
   UNDEFINED((byte) 0x00, "undefined"),
 
-  Account((byte) 0x01, "account"),
+  Account((byte) 0x01, "account"),//去掉asset
   AccountAsset((byte) 0x02, "account-asset"),
   AccountIndex((byte) 0x03, "account-index"),
   AccountIdIndex((byte) 0x04, "accountid-index"),

@@ -162,6 +162,7 @@ public class WorldStateCallBack {
     }
     trie = new TrieImpl2(chainBaseManager.getMerkleStorage());
     clear();
+
     trie.commit();
     trie.flush();
     Bytes32 newRoot = trie.getRootHashByte32();
