@@ -3,6 +3,9 @@ package org.tron.core.state;
 import com.beust.jcommander.internal.Lists;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.primitives.Longs;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +37,7 @@ public class WorldStateCallBack {
   protected ChainBaseManager chainBaseManager;
 
   private BlockCapsule blockCapsule;
+  private static final String FILE_PATH = CommonParameter.getInstance().getOutputDirectory().concat("stateFile");
 
   private static final List<StateType> saveTypeList = Lists.newArrayList(StateType.Account,
       StateType.AccountAsset,StateType.Delegation,StateType.StorageRow);
@@ -49,9 +53,9 @@ public class WorldStateCallBack {
   }
 
   public void callBack(StateType type, byte[] key, byte[] value, Value.Operator op) {
-    if (!exe() || type == StateType.UNDEFINED||!saveTypeList.contains(type)) {
-      return;
-    }
+//    if (!exe() || type == StateType.UNDEFINED||!saveTypeList.contains(type)) {
+//      return;
+//    }
     if (op == Value.Operator.DELETE || ArrayUtils.isEmpty(value)) {
       if (type == StateType.Account && chainBaseManager.getDynamicPropertiesStore()
               .getAllowAccountAssetOptimizationFromRoot() == 1) {
@@ -135,7 +139,12 @@ public class WorldStateCallBack {
       Bytes valBytes = (Bytes) entry.getValue();
       sb.append(blockCapsule.getNum()+" "+keyBytes.toBase64String()+" "+valBytes.toBase64String()+"\n");
     }
-    //todo write
+    try (BufferedWriter bufferedWriter = new BufferedWriter(
+        new FileWriter(FILE_PATH, true))) {
+      bufferedWriter.write(sb.toString());
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
   }
 
   public void preExeTrans() {
