@@ -1,8 +1,10 @@
 package org.tron.core.state;
 
+import com.beust.jcommander.internal.Lists;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.primitives.Longs;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import lombok.Getter;
 import lombok.Setter;
@@ -12,6 +14,7 @@ import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.bytes.Bytes32;
 import org.hyperledger.besu.ethereum.trie.MerkleTrieException;
 import org.springframework.stereotype.Component;
+import org.springframework.util.Base64Utils;
 import org.tron.common.parameter.CommonParameter;
 import org.tron.core.ChainBaseManager;
 import org.tron.core.capsule.AccountCapsule;
@@ -32,6 +35,9 @@ public class WorldStateCallBack {
 
   private BlockCapsule blockCapsule;
 
+  private static final List<StateType> saveTypeList = Lists.newArrayList(StateType.Account,
+      StateType.AccountAsset,StateType.Delegation,StateType.StorageRow);
+
   @Getter
   @VisibleForTesting
   private volatile TrieImpl2 trie;
@@ -43,7 +49,7 @@ public class WorldStateCallBack {
   }
 
   public void callBack(StateType type, byte[] key, byte[] value, Value.Operator op) {
-    if (!exe() || type == StateType.UNDEFINED) {
+    if (!exe() || type == StateType.UNDEFINED||!saveTypeList.contains(type)) {
       return;
     }
     if (op == Value.Operator.DELETE || ArrayUtils.isEmpty(value)) {
@@ -116,8 +122,20 @@ public class WorldStateCallBack {
     if (!exe()) {
       return;
     }
-    trieEntryList.forEach(trie::put);
+    //trieEntryList.forEach(trie::put);
+    //trieEntry写入文件
+    writeToFile(trieEntryList);
     trieEntryList.clear();
+  }
+
+  private void writeToFile(Map<Bytes, Bytes> trieEntryList) {
+    StringBuilder sb = new StringBuilder();
+    for(Map.Entry entry:trieEntryList.entrySet()) {
+      Bytes keyBytes = (Bytes) entry.getKey();
+      Bytes valBytes = (Bytes) entry.getValue();
+      sb.append(blockCapsule.getNum()+" "+keyBytes.toBase64String()+" "+valBytes.toBase64String()+"\n");
+    }
+    //todo write
   }
 
   public void preExeTrans() {
@@ -162,7 +180,6 @@ public class WorldStateCallBack {
     }
     trie = new TrieImpl2(chainBaseManager.getMerkleStorage());
     clear();
-
     trie.commit();
     trie.flush();
     Bytes32 newRoot = trie.getRootHashByte32();

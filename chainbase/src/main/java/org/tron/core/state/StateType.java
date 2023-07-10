@@ -14,6 +14,7 @@ public enum StateType {
   // 可能影响：erigon自身针对字段压缩，java go版本mdb差异(数据占用对比)，
   // java调用go 还是直接使用java版，java版对比实际存储差异，java go 按接口 采用erigon db测试方案，lmdb-java方案
   // 数据跑多久，机器配置？几台机器？
+  // type保留 account,account-asset,delegation,storage-row
 
   UNDEFINED((byte) 0x00, "undefined"),
 
