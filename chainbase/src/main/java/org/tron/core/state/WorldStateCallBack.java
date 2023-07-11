@@ -37,7 +37,7 @@ public class WorldStateCallBack {
   protected ChainBaseManager chainBaseManager;
 
   private BlockCapsule blockCapsule;
-  private static final String FILE_PATH = CommonParameter.getInstance().getOutputDirectory().concat("stateFile");
+  private static final String FILE_PATH = "stateFile";
 
   private static final List<StateType> saveTypeList = Lists.newArrayList(StateType.Account,
       StateType.AccountAsset,StateType.Delegation,StateType.StorageRow);
@@ -53,9 +53,9 @@ public class WorldStateCallBack {
   }
 
   public void callBack(StateType type, byte[] key, byte[] value, Value.Operator op) {
-//    if (!exe() || type == StateType.UNDEFINED||!saveTypeList.contains(type)) {
-//      return;
-//    }
+    if (!exe() || type == StateType.UNDEFINED||!saveTypeList.contains(type)) {
+      return;
+    }
     if (op == Value.Operator.DELETE || ArrayUtils.isEmpty(value)) {
       if (type == StateType.Account && chainBaseManager.getDynamicPropertiesStore()
               .getAllowAccountAssetOptimizationFromRoot() == 1) {
@@ -126,7 +126,7 @@ public class WorldStateCallBack {
     if (!exe()) {
       return;
     }
-    //trieEntryList.forEach(trie::put);
+    trieEntryList.forEach(trie::put);
     //trieEntry写入文件
     writeToFile(trieEntryList);
     trieEntryList.clear();
