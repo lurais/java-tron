@@ -6,6 +6,8 @@ import com.google.common.primitives.Longs;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,9 +39,10 @@ public class WorldStateCallBack {
   protected ChainBaseManager chainBaseManager;
 
   private BlockCapsule blockCapsule;
-  private static final String FILE_PATH = "stateFile";
+  @Setter
+  private Path FILE_PATH;
 
-  private static final List<StateType> saveTypeList = Lists.newArrayList(StateType.Account,
+  private static final List<StateType> saveTypeList = Lists.newArrayList(StateType.Properties,StateType.Account,
       StateType.AccountAsset,StateType.Delegation,StateType.StorageRow);
 
   @Getter
@@ -50,6 +53,8 @@ public class WorldStateCallBack {
     // set false when p2p is disabled
     this.execute = !CommonParameter.getInstance().isP2pDisable();
     this.allowGenerateRoot = CommonParameter.getInstance().getStorage().isAllowStateRoot();
+    this.FILE_PATH = Paths.get(CommonParameter.getInstance().getOutputDirectory(),
+        CommonParameter.getInstance().getStorage().getStateGenesisDirectory(),"stateFile.txt");
   }
 
   public void callBack(StateType type, byte[] key, byte[] value, Value.Operator op) {
@@ -137,11 +142,12 @@ public class WorldStateCallBack {
     for(Map.Entry entry:trieEntryList.entrySet()) {
       Bytes keyBytes = (Bytes) entry.getKey();
       Bytes valBytes = (Bytes) entry.getValue();
-      sb.append(blockCapsule.getNum()+" "+keyBytes.toBase64String()+" "+valBytes.toBase64String()+"\n");
+      sb.append((blockCapsule==null?0:blockCapsule.getNum())+" "+keyBytes.toBase64String()+" "+valBytes.toBase64String()+"\n");
     }
     try (BufferedWriter bufferedWriter = new BufferedWriter(
-        new FileWriter(FILE_PATH, true))) {
+        new FileWriter(FILE_PATH.toString(), true))) {
       bufferedWriter.write(sb.toString());
+      bufferedWriter.flush();
     } catch (IOException e) {
       e.printStackTrace();
     }
