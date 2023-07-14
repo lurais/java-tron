@@ -4303,9 +4303,12 @@ public class Wallet {
       }
 
       return energyFee;
-    } catch (Exception e) {
+    } catch (IllegalArgumentException e) {
       logger.error("getEnergyFee timestamp={} failed, error is {}", timestamp, e.getMessage());
       return getEnergyFee();
+    } catch (Exception e) {
+      logger.error("getEnergyFee timestamp={} failed, error is {}", timestamp, e.getMessage());
+      throw e;
     }
   }
 
