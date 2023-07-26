@@ -25,6 +25,7 @@ import org.tron.core.config.args.Args;
 import org.tron.core.config.args.DynamicArgs;
 import org.tron.core.consensus.ConsensusService;
 import org.tron.core.db.Manager;
+import org.tron.core.db.common.iterator.DBIterator;
 import org.tron.core.metrics.MetricsUtil;
 import org.tron.core.net.TronNetService;
 import org.tron.program.FullNode;
@@ -146,10 +147,11 @@ public class ApplicationImpl implements Application, ApplicationListener<Context
     long iterCount = 0;
     long newAlgorithmCycle = chainBaseManager.getDynamicPropertiesStore().getNewRewardAlgorithmEffectiveCycle();
     logger.info("statAccountStake begin,newAlgorithmCycle="+newAlgorithmCycle);
-    byte[]  key =ByteArray.fromHex("413AE9741DD749698B88AE28ACE1D91DFB0DFAED2C").getBytes();
+    byte[]  key =ByteArray.fromHexString("413ae9741dd749698b88ae28ace1d91dfb0dfaed2c");
     long beginCycle = chainBaseManager.getDelegationStore().getBeginCycle(key);
     long endCycle = chainBaseManager.getDelegationStore().getEndCycle(key);
-   // logger.info("beginCycle:"+beginCycle+",newAlgoCycle="+newAlgorithmCycle+"endCycle:"+endCycle+",accountVoteSize:"+chainBaseManager.getAccountStore().get(key).getVotesList());
+
+    logger.info("beginCycle:"+beginCycle+",newAlgoCycle="+newAlgorithmCycle+"endCycle:"+endCycle+",accountVoteSize:"+chainBaseManager.getAccountStore().get(key).getVotesList());
 
     for (Map.Entry<byte[], AccountCapsule> entry : chainBaseManager.getAccountStore()) {
       iterCount++;
