@@ -149,6 +149,9 @@ public class ApplicationImpl implements Application, ApplicationListener<Context
       iterCount++;
       long beginCycle = chainBaseManager.getDelegationStore().getBeginCycle(entry.getKey());
       long endCycle = chainBaseManager.getDelegationStore().getEndCycle(entry.getKey());
+      if(entry.getValue().createReadableString().equals("413AE9741DD749698B88AE28ACE1D91DFB0DFAED2C")){
+        logger.info("beginCycle:"+beginCycle+",newAlgoCycle="+newAlgorithmCycle+"endCycle:"+endCycle+",accountVoteSize:"+entry.getValue().getVotesList().size());
+      }
       if (beginCycle >= 0 && beginCycle < newAlgorithmCycle && fitOld(beginCycle,endCycle,entry.getKey(),entry.getValue())) {
         logStakeOld(entry.getValue(),  beginCycle,endCycle);
       }
