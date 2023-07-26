@@ -149,7 +149,7 @@ public class ApplicationImpl implements Application, ApplicationListener<Context
     byte[]  key =ByteArray.fromHex("413AE9741DD749698B88AE28ACE1D91DFB0DFAED2C").getBytes();
     long beginCycle = chainBaseManager.getDelegationStore().getBeginCycle(key);
     long endCycle = chainBaseManager.getDelegationStore().getEndCycle(key);
-    logger.info("beginCycle:"+beginCycle+",newAlgoCycle="+newAlgorithmCycle+"endCycle:"+endCycle+",accountVoteSize:"+chainBaseManager.getAccountStore().get(key).getVotesList());
+   // logger.info("beginCycle:"+beginCycle+",newAlgoCycle="+newAlgorithmCycle+"endCycle:"+endCycle+",accountVoteSize:"+chainBaseManager.getAccountStore().get(key).getVotesList());
 
     for (Map.Entry<byte[], AccountCapsule> entry : chainBaseManager.getAccountStore()) {
       iterCount++;
