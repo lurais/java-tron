@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.tron.common.logsfilter.EventPluginLoader;
 import org.tron.common.parameter.CommonParameter;
+import org.tron.common.utils.ByteArray;
 import org.tron.core.ChainBaseManager;
 import org.tron.core.capsule.AccountCapsule;
 import org.tron.core.capsule.BytesCapsule;
@@ -145,10 +146,15 @@ public class ApplicationImpl implements Application, ApplicationListener<Context
     long iterCount = 0;
     long newAlgorithmCycle = chainBaseManager.getDynamicPropertiesStore().getNewRewardAlgorithmEffectiveCycle();
     logger.info("statAccountStake begin,newAlgorithmCycle="+newAlgorithmCycle);
+    byte[]  key =ByteArray.fromHex("413AE9741DD749698B88AE28ACE1D91DFB0DFAED2C").getBytes();
+    long beginCycle = chainBaseManager.getDelegationStore().getBeginCycle(key);
+    long endCycle = chainBaseManager.getDelegationStore().getEndCycle(key);
+    logger.info("beginCycle:"+beginCycle+",newAlgoCycle="+newAlgorithmCycle+"endCycle:"+endCycle+",accountVoteSize:"+chainBaseManager.getAccountStore().get(key).getVotesList());
+
     for (Map.Entry<byte[], AccountCapsule> entry : chainBaseManager.getAccountStore()) {
       iterCount++;
-      long beginCycle = chainBaseManager.getDelegationStore().getBeginCycle(entry.getKey());
-      long endCycle = chainBaseManager.getDelegationStore().getEndCycle(entry.getKey());
+       beginCycle = chainBaseManager.getDelegationStore().getBeginCycle(entry.getKey());
+       endCycle = chainBaseManager.getDelegationStore().getEndCycle(entry.getKey());
       if(entry.getValue().createReadableString().equals("413AE9741DD749698B88AE28ACE1D91DFB0DFAED2C")){
         logger.info("beginCycle:"+beginCycle+",newAlgoCycle="+newAlgorithmCycle+"endCycle:"+endCycle+",accountVoteSize:"+entry.getValue().getVotesList().size());
       }
