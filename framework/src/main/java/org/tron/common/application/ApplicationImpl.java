@@ -151,7 +151,7 @@ public class ApplicationImpl implements Application, ApplicationListener<Context
     long beginCycle = chainBaseManager.getDelegationStore().getBeginCycle(key);
     long endCycle = chainBaseManager.getDelegationStore().getEndCycle(key);
 
-    logger.info("beginCycle:"+beginCycle+",newAlgoCycle="+newAlgorithmCycle+"endCycle:"+endCycle+",accountVoteSize:"+chainBaseManager.getAccountStore().get(key).getVotesList()+",frozenBalance:"+chainBaseManager.getAccountStore().get(key).getFrozenBalance());
+    logger.info("beginCycle:"+beginCycle+",newAlgoCycle="+newAlgorithmCycle+"endCycle:"+endCycle+",accountVoteSize:"+chainBaseManager.getAccountStore().get(key).getVotesList()+",frozenBalance:"+chainBaseManager.getAccountStore().get(key).getFrozenBalance()+"accountCapsule:"+chainBaseManager.getAccountStore().get(key));
 
     for (Map.Entry<byte[], AccountCapsule> entry : chainBaseManager.getAccountStore()) {
       iterCount++;
