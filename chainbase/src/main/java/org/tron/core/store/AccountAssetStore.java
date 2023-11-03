@@ -45,7 +45,7 @@ public class AccountAssetStore extends TronDatabase<byte[]> {
     byte[] data = dbSource.getData(key);
     long meterLength = TxMeterUtil.calcLengthSum(key, data);
     if (meterLength > 0) {
-      TxMeter.incrReadLength(data.length);
+      TxMeter.incrReadLength(meterLength);
     }
     return data;
   }
