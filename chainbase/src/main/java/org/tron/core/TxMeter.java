@@ -11,6 +11,9 @@ import java.util.Objects;
 public class TxMeter {
 
   private static final ThreadLocal<Meter> cache = new ThreadLocal<>();
+  public static final long DEFAULT_DELETE_METER_BYTES = 100L;
+  public static final long DEFAULT_HAS_METER_BYTES = 100L;
+
 
   private TxMeter(){}
 

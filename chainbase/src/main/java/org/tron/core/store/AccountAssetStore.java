@@ -2,12 +2,14 @@ package org.tron.core.store;
 
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Longs;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.ArrayUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.tron.common.utils.ByteArray;
 import org.tron.core.TxMeter;
+import org.tron.core.TxMeterUtil;
 import org.tron.core.db.TronDatabase;
 import org.tron.core.db2.common.WrappedByteArray;
 import org.tron.protos.Protocol;
@@ -25,21 +27,24 @@ public class AccountAssetStore extends TronDatabase<byte[]> {
 
   @Override
   public void put(byte[] key, byte[] item) {
-    if (item != null && item.length > 0) {
-      TxMeter.incrWriteLength(item.length);
-    }
     dbSource.putData(key, item);
+    long meterLength = TxMeterUtil.calcLengthSum(key, item);
+    if(meterLength > 0) {
+      TxMeter.incrWriteLength(meterLength);
+    }
   }
 
   @Override
   public void delete(byte[] key) {
     dbSource.deleteData(key);
+    TxMeter.incrWriteLength(TxMeter.DEFAULT_DELETE_METER_BYTES);
   }
 
   @Override
   public byte[] get(byte[] key) {
     byte[] data = dbSource.getData(key);
-    if (data != null && data.length > 0) {
+    long meterLength = TxMeterUtil.calcLengthSum(key, data);
+    if (meterLength > 0) {
       TxMeter.incrReadLength(data.length);
     }
     return data;
@@ -48,9 +53,7 @@ public class AccountAssetStore extends TronDatabase<byte[]> {
   @Override
   public boolean has(byte[] key) {
     byte[] data = dbSource.getData(key);
-    if (data != null && data.length > 0) {
-      TxMeter.incrReadLength(data.length);
-    }
+    TxMeter.incrReadLength(TxMeter.DEFAULT_HAS_METER_BYTES);
     return data != null;
   }
 
@@ -58,12 +61,11 @@ public class AccountAssetStore extends TronDatabase<byte[]> {
     Map<byte[], byte[]> assets = convert(getAssets(account));
     if (!assets.isEmpty()) {
       updateByBatch(assets);
-      long total = assets.
-              values()
+      long total = assets.entrySet()
               .stream()
-              .mapToInt(b-> b.length)
+              .mapToLong(b-> TxMeterUtil.calcLengthSum(b.getKey(), b.getValue()))
               .sum();
-      TxMeter.incrReadLength(total);
+      TxMeter.incrWriteLength(total);
     }
   }
 
@@ -71,12 +73,7 @@ public class AccountAssetStore extends TronDatabase<byte[]> {
     Map<byte[], byte[]> assets = convert(getDeletedAssets(key));
     if (!assets.isEmpty()) {
       updateByBatch(assets);
-      long total = assets.
-              values()
-              .stream()
-              .mapToInt(b-> b.length)
-              .sum();
-      TxMeter.incrWriteLength(total);
+      TxMeter.incrWriteLength(TxMeter.DEFAULT_DELETE_METER_BYTES * assets.size());
     }
   }
 
@@ -95,11 +92,8 @@ public class AccountAssetStore extends TronDatabase<byte[]> {
 
   public Map<WrappedByteArray, WrappedByteArray> getDeletedAssets(byte[] key) {
     Map<WrappedByteArray, WrappedByteArray> assets = new HashMap<>();
-    prefixQuery(key).forEach((k, v) -> {
-                assets.put(WrappedByteArray.of(k.getBytes()), WrappedByteArray.of(null));
-                TxMeter.incrReadLength(v.length);
-            }
-    );
+    prefixQuery(key).forEach((k, v) ->
+        assets.put(WrappedByteArray.of(k.getBytes()), WrappedByteArray.of(null)));
     return assets;
   }
 
@@ -125,11 +119,16 @@ public class AccountAssetStore extends TronDatabase<byte[]> {
     Map<String, Long> assets = new HashMap<>();
     if (account.getAssetOptimized()) {
       Map<WrappedByteArray, byte[]> map = prefixQuery(account.getAddress().toByteArray());
+      AtomicLong meterLength = new AtomicLong(0L);
       map.forEach((k, v) -> {
         byte[] assetID = ByteArray.subArray(k.getBytes(),
                 account.getAddress().toByteArray().length, k.getBytes().length);
         assets.put(ByteArray.toStr(assetID), Longs.fromByteArray(v));
+        meterLength.addAndGet(TxMeterUtil.calcLengthSum(k.getBytes(), v));
       });
+      if(meterLength.longValue() > 0) {
+        TxMeter.incrReadLength(meterLength.get());
+      }
     }
     account.getAssetV2Map().forEach((k, v) -> assets.put(k, v));
     return assets;
