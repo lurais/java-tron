@@ -92,8 +92,15 @@ public class AccountAssetStore extends TronDatabase<byte[]> {
 
   public Map<WrappedByteArray, WrappedByteArray> getDeletedAssets(byte[] key) {
     Map<WrappedByteArray, WrappedByteArray> assets = new HashMap<>();
-    prefixQuery(key).forEach((k, v) ->
-        assets.put(WrappedByteArray.of(k.getBytes()), WrappedByteArray.of(null)));
+    AtomicLong meterLength = new AtomicLong(0L);
+    prefixQuery(key).forEach((k, v) -> {
+          assets.put(WrappedByteArray.of(k.getBytes()), WrappedByteArray.of(null));
+          meterLength.addAndGet(TxMeterUtil.calcLengthSum(k.getBytes(), v));
+        }
+    );
+    if(meterLength.get() > 0) {
+      TxMeter.incrReadLength(meterLength.get());
+    }
     return assets;
   }
 
