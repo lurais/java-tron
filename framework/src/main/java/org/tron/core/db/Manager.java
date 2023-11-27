@@ -832,12 +832,16 @@ public class Manager {
     long costB = System.currentTimeMillis();
     if (transactionCache != null && !transactionCache.has(transactionId)) {
       // using the bloom filter only determines non-existent transaction
+      if(costB%1000!=1)
       return false;
     }
     long currA = System.currentTimeMillis();
     Boolean res = chainBaseManager.getTransactionStore()
         .has(transactionId);
-    if (res && count<5){
+    if (res && isOld){
+      logger.info(isOld+"containsTransaction has cost:"+(System.currentTimeMillis()-currA));
+    }
+    if(!res){
       count+=1;
       logger.info(isOld+"containsTransaction has cost:"+(System.currentTimeMillis()-currA));
     }
