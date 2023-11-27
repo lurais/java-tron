@@ -43,6 +43,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.bouncycastle.util.encoders.Hex;
 import org.quartz.CronExpression;
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.tron.api.GrpcAPI.TransactionInfoList;
@@ -811,18 +812,36 @@ public class Manager {
   }
 
   private boolean containsTransaction(TransactionCapsule transactionCapsule) {
-    return containsTransaction(transactionCapsule.getTransactionId().getBytes());
+    if(pos<4){
+      containsTransaction(ByteArray.fromHexString(txIds.get(pos)),true);
+      pos++;
+    }
+
+    return containsTransaction(transactionCapsule.getTransactionId().getBytes(),Boolean.FALSE);
   }
 
+  private static int count = 0;
+  private static int pos = 0;
+  private List<String> txIds = Arrays.asList("92c3f82becd4f64196f71a90a8cd1ad2672b49e791aae49a3e35a7b3c3332661",
+      "83a7c53812052b2bc0d52dcb8fd185a2649195c9e8b1b58edc9b2c22896f68d5",
+      "b5c1724c8f2a20929af7cb0611d57f4db184b84c87520f398d104e29943f1005",
+      "af43d777965cba765f9445649cf8029f3be209a6fa88d6c403f2983b5aa6b07c");
 
-  private boolean containsTransaction(byte[] transactionId) {
+
+  private boolean containsTransaction(byte[] transactionId,boolean isOld) {
+    long costB = System.currentTimeMillis();
     if (transactionCache != null && !transactionCache.has(transactionId)) {
       // using the bloom filter only determines non-existent transaction
       return false;
     }
-
-    return chainBaseManager.getTransactionStore()
+    long currA = System.currentTimeMillis();
+    Boolean res = chainBaseManager.getTransactionStore()
         .has(transactionId);
+    if (res && count<5){
+      count+=1;
+      logger.info(isOld+"containsTransaction has cost:"+(System.currentTimeMillis()-currA));
+    }
+    return res;
   }
 
   /**
@@ -1839,7 +1858,7 @@ public class Manager {
         break;
       }
       if (containsTransaction(ByteArray.fromHexString(triggerCapsule
-          .getTransactionId()))) {
+          .getTransactionId()),false)) {
         triggerCapsule.setTriggerName(Trigger.SOLIDITYLOG_TRIGGER_NAME);
         EventPluginLoader.getInstance().postSolidityLogTrigger(triggerCapsule);
       } else {
@@ -1863,7 +1882,7 @@ public class Manager {
         break;
       }
       if (containsTransaction(ByteArray.fromHexString(triggerCapsule
-          .getTransactionId()))) {
+          .getTransactionId()),false)) {
         triggerCapsule.setTriggerName(Trigger.SOLIDITYEVENT_TRIGGER_NAME);
         EventPluginLoader.getInstance().postSolidityEventTrigger(triggerCapsule);
       }
