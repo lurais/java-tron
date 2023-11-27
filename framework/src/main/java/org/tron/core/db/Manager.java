@@ -840,7 +840,7 @@ public class Manager {
     Boolean res = chainBaseManager.getTransactionStore()
         .has(transactionId);
     if (isOld){
-      logger.info(isOld+"containsTransaction has cost:"+(System.nanoTime()-currA)*0.000001);
+      logger.info(res+"isOld:"+isOld+"containsTransaction has cost:"+(System.nanoTime()-currA)*0.000001);
       return res;
     }
     if(!res){
