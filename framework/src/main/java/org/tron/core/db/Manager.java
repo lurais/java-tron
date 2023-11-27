@@ -829,21 +829,22 @@ public class Manager {
 
 
   private boolean containsTransaction(byte[] transactionId,boolean isOld) {
-    long costB = System.currentTimeMillis();
+
+    long costB = System.nanoTime();
     if (transactionCache != null && !transactionCache.has(transactionId)) {
       // using the bloom filter only determines non-existent transaction
-      if(costB%1000!=1)
+      if((!isOld) &&(costB%1000!=1))
       return false;
     }
-    long currA = System.currentTimeMillis();
+    long currA = System.nanoTime();
     Boolean res = chainBaseManager.getTransactionStore()
         .has(transactionId);
-    if (res && isOld){
-      logger.info(isOld+"containsTransaction has cost:"+(System.currentTimeMillis()-currA));
+    if (isOld){
+      logger.info(isOld+"containsTransaction has cost:"+(System.nanoTime()-currA)/1000.0);
     }
     if(!res){
       count+=1;
-      logger.info(isOld+"containsTransaction has cost:"+(System.currentTimeMillis()-currA));
+      logger.info(isOld+"containsTransaction has cost:"+(System.nanoTime()-currA)/1000.0);
     }
     return res;
   }
