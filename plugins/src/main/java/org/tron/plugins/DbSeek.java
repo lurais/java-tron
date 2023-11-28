@@ -1,21 +1,16 @@
 package org.tron.plugins;
 
-import ch.qos.logback.core.util.FileUtil;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import lombok.extern.slf4j.Slf4j;
 import org.iq80.leveldb.DB;
 import org.tron.plugins.utils.ByteArray;
 import org.tron.plugins.utils.DBUtils;
-import org.tron.plugins.utils.FileUtils;
-import org.tron.plugins.utils.db.DbTool;
 import picocli.CommandLine;
 
 @Slf4j(topic = "seek")
