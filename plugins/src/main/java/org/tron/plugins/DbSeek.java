@@ -15,7 +15,7 @@ import picocli.CommandLine;
 
 @Slf4j(topic = "seek")
 @CommandLine.Command(name = "seek",
-    description = "Seek data for java-tron.",
+    description = "Seek data in db.",
     exitCodeListHeading = "Exit Codes:%n",
     exitCodeList = {
         "0:Successful",
@@ -30,7 +30,7 @@ public class DbSeek implements Callable<Integer> {
   @CommandLine.Option(
       names = {"--keyPath", "-kp"},
       required = true,
-      description = "the database path to be split or merged.",
+      description = "the key list path to seek in db.",
       order = 3)
   private String keyPath;
 
@@ -82,13 +82,11 @@ public class DbSeek implements Callable<Integer> {
   }
 
   private void readFileToList(List<String> list, String keyPath) {
-    try {
-      BufferedReader reader = new BufferedReader(new FileReader(keyPath));
+    try(BufferedReader reader = new BufferedReader(new FileReader(keyPath))) {
       String line;
       while ((line = reader.readLine()) != null) {
         list.add(line);
       }
-      reader.close();
     } catch (IOException e) {
       e.printStackTrace();
     }
