@@ -2,9 +2,11 @@ package org.tron.plugins;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.UUID;
+import org.bouncycastle.util.encoders.Hex;
 import org.iq80.leveldb.DB;
 import org.junit.Before;
 import org.junit.Rule;
@@ -32,6 +34,7 @@ public class DbTest {
     initDB(new File(INPUT_DIRECTORY, ACCOUNT));
     initDB(new File(INPUT_DIRECTORY, MARKET));
     initDB(new File(INPUT_DIRECTORY, DBUtils.CHECKPOINT_DB_V2));
+    initDB(new File(INPUT_DIRECTORY, DbInspect.DELEGATION_DB));
   }
 
   private static void initDB(File file) throws IOException {
@@ -83,6 +86,10 @@ public class DbTest {
           byte[] bytes = UUID.randomUUID().toString().getBytes();
           db.put(bytes, bytes);
         }
+        db.put((2903 + "-" + "41547098d5b81f8ec49376589bb49e9c82d19ad17d" + "-vi").getBytes(),BigInteger.valueOf(100L).toByteArray());
+        db.put((2903 + "-" + "4154a6de9a4afd83f14b260531bddf632ff5b64f55" + "-vi").getBytes(),BigInteger.valueOf(100L).toByteArray());
+        db.put((2904 + "-" + "41547098d5b81f8ec49376589bb49e9c82d19ad17d" + "-vi").getBytes(),BigInteger.valueOf(107L).toByteArray());
+        db.put((2904 + "-" + "4154a6de9a4afd83f14b260531bddf632ff5b64f55" + "-vi").getBytes(),BigInteger.valueOf(108L).toByteArray());
       }
     }
   }
