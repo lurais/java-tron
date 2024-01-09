@@ -7,6 +7,7 @@ import java.util.concurrent.Callable;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.SerializationUtils;
+import org.bouncycastle.util.encoders.Hex;
 import org.rocksdb.RocksDBException;
 import org.tron.plugins.utils.db.DBInterface;
 import org.tron.plugins.utils.db.DBIterator;
@@ -30,6 +31,8 @@ public class DbInspect implements Callable<Integer> {
 
 
   enum Operate {split, merge}
+
+  enum CycleData {vote,reward,brokerage}
 
   @CommandLine.Spec
   CommandLine.Model.CommandSpec spec;
@@ -105,18 +108,36 @@ public class DbInspect implements Callable<Integer> {
       HashMap<byte[], BigInteger> addrToReward = currentAddrMap == null ? new HashMap<>() :
           SerializationUtils.deserialize(currentAddrMap);
       if (addrToReward.values().stream().distinct().count() > 1) {
-         logDiff(curr, addrToReward);
+         logDiff(delegationDb,curr, addrToReward);
       }
     }
   }
 
-  private void logDiff(long cycle, HashMap<byte[], BigInteger> addrToReward) {
+  private void logDiff(DBInterface delegationDb, long cycle, HashMap<byte[], BigInteger> addrToReward) {
     StringBuilder sb = new StringBuilder();
     sb.append("different reward cycle found, cycle:" + cycle + "\n");
     addrToReward.entrySet().stream().forEach(bigIntegerEntry -> sb.append(
-        "sr:" + new String(bigIntegerEntry.getKey()) + ",reward:" + bigIntegerEntry.getValue() +
+        "sr:" + new String(bigIntegerEntry.getKey()) + ",deltaReward:" + bigIntegerEntry.getValue() +
+            ",vote:"+findCycleInfo(delegationDb,new String(bigIntegerEntry.getKey()),cycle,CycleData.vote)+
+            ",reward:"+findCycleInfo(delegationDb,new String(bigIntegerEntry.getKey()),cycle,CycleData.reward)+
+            ",brokerage:"+findCycleInfo(delegationDb,new String(bigIntegerEntry.getKey()),cycle,CycleData.brokerage)+
             "\n"));
     logger.info(sb.toString());
+  }
+
+  private String findCycleInfo(DBInterface delegationDb, String sr, long cycle, CycleData cycleData) {
+    switch (cycleData){
+      case vote:
+        byte[] value = delegationDb.get((cycle + "-" + sr + "-vote").getBytes());
+        return ArrayUtils.isEmpty(value)?"0":new BigInteger(value)+"";
+      case reward:
+        value = delegationDb.get((cycle + "-" + sr + "-reward").getBytes());
+        return ArrayUtils.isEmpty(value)?"0":new BigInteger(value)+"";
+      case brokerage:
+        value = delegationDb.get((cycle + "-" + sr + "-brokerage").getBytes());
+        return ArrayUtils.isEmpty(value)?"0":new BigInteger(value)+"";
+    }
+    return "";
   }
 
   private void inspectDeltaReward(DBInterface db)
