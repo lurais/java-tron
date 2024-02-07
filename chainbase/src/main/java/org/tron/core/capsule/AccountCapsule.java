@@ -42,7 +42,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import static java.lang.Math.ceil;
 import static org.tron.core.config.Parameter.ChainConstant.BLOCK_PRODUCED_INTERVAL;
 import static org.tron.core.config.Parameter.ChainConstant.WINDOW_SIZE_MS;
 import static org.tron.core.config.Parameter.ChainConstant.WINDOW_SIZE_PRECISION;
@@ -626,6 +625,23 @@ public class AccountCapsule implements ProtoCapsule<Account>, Comparable<Account
     tp += account.getDelegatedFrozenV2BalanceForBandwidth();
     tp += account.getAccountResource().getDelegatedFrozenV2BalanceForEnergy();
     return tp;
+  }
+
+  public long getTrxFrozen(){
+    long allTrx = 0;
+    for (int i = 0; i < account.getFrozenCount(); ++i) {
+      allTrx += account.getFrozen(i).getFrozenBalance();
+    }
+
+    allTrx += account.getAccountResource().getFrozenBalanceForEnergy().getFrozenBalance();
+    allTrx += account.getTronPower().getFrozenBalance();
+    allTrx += account.getDelegatedFrozenBalanceForBandwidth();
+    allTrx += account.getAccountResource().getDelegatedFrozenBalanceForEnergy();
+
+    allTrx += getFrozenV2List().stream().mapToLong(FreezeV2::getAmount).sum();
+    allTrx += account.getDelegatedFrozenV2BalanceForBandwidth();
+    allTrx += account.getAccountResource().getDelegatedFrozenV2BalanceForEnergy();
+    return allTrx;
   }
 
   public long getAllTronPower() {

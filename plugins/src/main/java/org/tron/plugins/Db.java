@@ -9,7 +9,7 @@ import picocli.CommandLine;
     subcommands = {CommandLine.HelpCommand.class,
         DbMove.class,
         DbArchive.class,
-        DbConvert.class,
+        DbFilter.class,
         DbLite.class,
         DbCopy.class
     },
