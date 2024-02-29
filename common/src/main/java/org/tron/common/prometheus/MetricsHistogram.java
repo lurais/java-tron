@@ -58,6 +58,8 @@ public class MetricsHistogram {
 
     init(MetricKeys.Histogram.UNFREEZE_CAN_WITHDRAW, "unfreeze can withdraw.",
         LABEL_STAKE_VERSION, LABEL_CONTRACT_TYPE, LABEL_RESOURCE_TYPE);
+    init(MetricKeys.Histogram.DO_REWARD_CAL_DELAY,
+        "do reward cal delay time.", "depth");
   }
 
   private MetricsHistogram() {

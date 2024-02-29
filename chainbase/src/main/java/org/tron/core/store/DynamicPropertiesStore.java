@@ -224,6 +224,8 @@ public class DynamicPropertiesStore extends TronStoreWithRevoking<BytesCapsule> 
   private static final byte[] MAX_DELEGATE_LOCK_PERIOD =
       "MAX_DELEGATE_LOCK_PERIOD".getBytes();
 
+  private static final byte[] ALLOW_OLD_REWARD_OPT = "ALLOW_OLD_REWARD_OPT".getBytes();
+
   @Autowired
   private DynamicPropertiesStore(@Value("properties") String dbName) {
     super(dbName);
@@ -2565,6 +2567,10 @@ public class DynamicPropertiesStore extends TronStoreWithRevoking<BytesCapsule> 
     return getNewRewardAlgorithmEffectiveCycle() != Long.MAX_VALUE;
   }
 
+  public boolean useNewRewardAlgorithmFromStart() {
+    return getNewRewardAlgorithmEffectiveCycle() == 1;
+  }
+
   public void saveNewRewardAlgorithmEffectiveCycle() {
     if (getNewRewardAlgorithmEffectiveCycle() == Long.MAX_VALUE) {
       long currentCycle = getCurrentCycleNumber();
@@ -2873,6 +2879,32 @@ public class DynamicPropertiesStore extends TronStoreWithRevoking<BytesCapsule> 
   public boolean supportMaxDelegateLockPeriod() {
     return (getMaxDelegateLockPeriod() > DELEGATE_PERIOD / BLOCK_PRODUCED_INTERVAL) &&
             getUnfreezeDelayDays() > 0;
+  }
+
+  /**
+   *  @require NEW_REWARD_ALGORITHM_EFFECTIVE_CYCLE != Long.MAX_VALUE
+   *  @require NEW_REWARD_ALGORITHM_EFFECTIVE_CYCLE > 1
+   */
+  public void saveAllowOldRewardOpt(long allowOldRewardOpt) {
+    if (useNewRewardAlgorithm()) {
+      if (useNewRewardAlgorithmFromStart()) {
+        throw new IllegalStateException("no need old reward opt, ALLOW_NEW_REWARD from start");
+      }
+      this.put(ALLOW_OLD_REWARD_OPT, new BytesCapsule(ByteArray.fromLong(allowOldRewardOpt)));
+    } else {
+      throw new IllegalStateException("not support old reward opt, ALLOW_NEW_REWARD not set");
+    }
+  }
+
+  public boolean allowOldRewardOpt() {
+    return getAllowOldRewardOpt() == 1L;
+  }
+
+  public long getAllowOldRewardOpt() {
+    return Optional.ofNullable(getUnchecked(ALLOW_OLD_REWARD_OPT))
+        .map(BytesCapsule::getData)
+        .map(ByteArray::toLong)
+        .orElse(CommonParameter.getInstance().getAllowOldRewardOpt());
   }
 
   private static class DynamicResourceProperties {

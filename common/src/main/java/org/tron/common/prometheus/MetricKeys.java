@@ -72,6 +72,8 @@ public class MetricKeys {
     public static final String MESSAGE_PROCESS_LATENCY = "tron:message_process_latency_seconds";
     public static final String BLOCK_FETCH_LATENCY = "tron:block_fetch_latency_seconds";
     public static final String BLOCK_RECEIVE_DELAY = "tron:block_receive_delay_seconds";
+    public static final String DO_REWARD_CAL_DELAY = "tron:do_reward_cal_seconds";
+
 
     public static final String STAKE_HISTOGRAM = "tron:stake_h";
     public static final String UNFREEZE_CAN_WITHDRAW = "tron:unfreeze_can_withdraw";
