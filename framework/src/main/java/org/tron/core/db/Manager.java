@@ -1303,21 +1303,24 @@ public class Manager {
               return;
             }
             try (ISession tmpSession = revokingStore.buildSession()) {
-
-              long oldSolidNum =
-                      chainBaseManager.getDynamicPropertiesStore().getLatestSolidifiedBlockNum();
-
               applyBlock(newBlock, txs);
               tmpSession.commit();
-              // if event subscribe is enabled, post block trigger to queue
-              postBlockTrigger(newBlock);
-              // if event subscribe is enabled, post solidity trigger to queue
-              postSolidityTrigger(oldSolidNum,
-                      getDynamicPropertiesStore().getLatestSolidifiedBlockNum());
             } catch (Throwable throwable) {
               logger.error(throwable.getMessage(), throwable);
               khaosDb.removeBlk(block.getBlockId());
               throw throwable;
+            }
+            try {
+              long oldSolidNum =
+                  chainBaseManager.getDynamicPropertiesStore().getLatestSolidifiedBlockNum();
+              // if event subscribe is enabled, post block trigger to queue
+              postBlockTrigger(newBlock);
+              // if event subscribe is enabled, post solidity trigger to queue
+              postSolidityTrigger(oldSolidNum,
+                  getDynamicPropertiesStore().getLatestSolidifiedBlockNum());
+            } catch (Exception e) {
+              logger.error("Block {} post trigger error.", newBlock.getBlockId(), e);
+              System.exit(1);
             }
           }
           logger.info(SAVE_BLOCK, newBlock);
